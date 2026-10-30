@@ -9,7 +9,10 @@
   --bg:#f6f8fa; --panel:#fff; --border:#d0d7de; --text:#1f2328; --muted:#656d76; --accent:#0969da;
   --add:#1a7f37; --add-bg:#dafbe1; --del:#cf222e; --del-bg:#ffebe9; --mod:#9a6700; --mod-bg:#fff8c5;
   --fmt:#8250df; --fmt-bg:#fbefff; --move:#0969da; --move-bg:#ddf4ff; --note:#57606a; --note-bg:#eaeef2;
-  --chip:#eff2f5; --hover:#f3f4f6; --g0:#ebedf0; --g1:#9be9a8; --g2:#40c463; --g3:#30a14e; --g4:#216e39;
+  --chip:#eff2f5; --hover:#f3f4f6; --g0:#ebedf0;
+  /* chart series (validated categorical order: blue, orange, aqua, yellow, magenta) */
+  --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a; --s4:#eda100; --s5:#e87ba4; --grid:#e6e8eb;
+  --q1:#cde2fb; --q2:#86b6ef; --q3:#3987e5; --q4:#1c5cab;
 }
 @media (prefers-color-scheme: dark){
   :root{
@@ -17,29 +20,40 @@
     --add:#3fb950; --add-bg:rgba(46,160,67,.2); --del:#f85149; --del-bg:rgba(248,81,73,.2);
     --mod:#d29922; --mod-bg:rgba(187,128,9,.2); --fmt:#a371f7; --fmt-bg:rgba(163,113,247,.2);
     --move:#4493f8; --move-bg:rgba(56,139,253,.2); --note:#8d96a0; --note-bg:rgba(110,118,129,.2);
-    --chip:#21262d; --hover:#1c2128; --g0:#161b22; --g1:#0e4429; --g2:#006d32; --g3:#26a641; --g4:#39d353;
+    --chip:#21262d; --hover:#1c2128; --g0:#21262d;
+    --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500; --s5:#d55181; --grid:#262c34;
+    --q1:#184f95; --q2:#1c5cab; --q3:#3987e5; --q4:#86b6ef;
   }
 }
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans",Helvetica,Arial,sans-serif}
+body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans","PingFang SC","Microsoft YaHei",Helvetica,Arial,sans-serif}
 a{color:var(--accent);text-decoration:none} a:hover{text-decoration:underline}
 button,select,input{font:inherit;color:inherit}
-.wrap{max-width:1040px;margin:0 auto;padding:0 16px}
+code{font:12px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:var(--chip);padding:1px 4px;border-radius:4px}
+.wrap{max-width:1080px;margin:0 auto;padding:0 16px}
 header{background:var(--panel);border-bottom:1px solid var(--border)}
-.top{display:flex;align-items:center;gap:12px;padding:16px 0 8px;flex-wrap:wrap}
+.top{display:flex;align-items:center;gap:10px;padding:16px 0 8px;flex-wrap:wrap}
 .logo{width:32px;height:32px;border-radius:8px;background:linear-gradient(135deg,#f9ab00,#e37400);display:grid;place-items:center;color:#fff;font-weight:700;flex:none}
 .deck{flex:1;min-width:200px}
 .deck h1{font-size:20px;margin:0;font-weight:600;word-break:break-word}
 .deck .sub{color:var(--muted);font-size:12px}
 .btn{border:1px solid var(--border);background:var(--chip);border-radius:6px;padding:5px 12px;cursor:pointer;white-space:nowrap}
 .btn:hover{background:var(--hover)}
+.btn:disabled{opacity:.55;cursor:not-allowed}
 .btn.primary{background:#1f883d;border-color:#1f883d;color:#fff}
+.btn.danger{background:var(--del);border-color:var(--del);color:#fff}
+.btn.sm{padding:2px 9px;font-size:12px}
+.menu{position:relative}
+.menu .pop{position:absolute;right:0;top:calc(100% + 4px);background:var(--panel);border:1px solid var(--border);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.15);padding:6px;z-index:30;min-width:220px}
+.menu .pop button{display:block;width:100%;text-align:left;border:0;background:none;padding:7px 10px;border-radius:6px;cursor:pointer}
+.menu .pop button:hover{background:var(--hover)}
+.menu .pop small{display:block;color:var(--muted)}
 .tabs{display:flex;gap:4px;overflow-x:auto}
 .tab{border:0;background:none;padding:8px 14px;border-bottom:2px solid transparent;cursor:pointer;color:var(--muted);white-space:nowrap}
 .tab.on{color:var(--text);border-bottom-color:#fd8c73;font-weight:600}
 .tab .n{background:var(--chip);border-radius:20px;padding:0 7px;font-size:12px;margin-left:4px}
 .filters{display:flex;gap:8px;flex-wrap:wrap;padding:16px 0 8px;align-items:center}
-.filters select,.filters input{border:1px solid var(--border);background:var(--panel);border-radius:6px;padding:5px 8px}
+.filters select,.filters input,.field{border:1px solid var(--border);background:var(--panel);border-radius:6px;padding:5px 8px}
 .filters input{flex:1;min-width:160px}
 .pill{display:inline-flex;align-items:center;gap:6px;background:var(--move-bg);color:var(--move);border-radius:20px;padding:2px 10px;font-size:12px}
 .pill button{border:0;background:none;cursor:pointer;color:inherit;padding:0;font-size:14px}
@@ -49,14 +63,19 @@ header{background:var(--panel);border-bottom:1px solid var(--border)}
 .day::before{content:"";width:8px;height:8px;border-radius:50%;border:2px solid var(--muted)}
 .box{background:var(--panel);border:1px solid var(--border);border-radius:6px;overflow:hidden}
 .commit{border-top:1px solid var(--border)} .commit:first-child{border-top:0}
+.commit.ver{background:linear-gradient(90deg,var(--note-bg),transparent 60%)}
 .chead{display:flex;align-items:center;gap:12px;padding:10px 14px;width:100%;border:0;background:none;text-align:left;cursor:pointer}
 .chead:hover{background:var(--hover)}
 .avs{display:flex;flex:none} .avs .av{margin-left:-8px;border:2px solid var(--panel)} .avs .av:first-child{margin-left:0}
 .av{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;color:#fff;font-size:11px;font-weight:700;flex:none}
+.av.unsure{opacity:.75;outline:2px dashed var(--muted);outline-offset:1px}
 .av.big{width:44px;height:44px;font-size:16px}
+.av.sys{background:var(--note)!important}
 .cmain{flex:1;min-width:0}
 .ctitle{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .cmeta{color:var(--muted);font-size:12px}
+.conf{font-size:11px;border-radius:20px;padding:0 6px;margin-left:4px;white-space:nowrap}
+.conf.ok{background:var(--add-bg);color:var(--add)} .conf.share{background:var(--mod-bg);color:var(--mod)} .conf.prob{background:var(--note-bg);color:var(--note)}
 .cright{display:flex;align-items:center;gap:6px;flex:none}
 .sha{font:12px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:var(--muted);border:1px solid var(--border);border-radius:6px;padding:1px 6px}
 .cnt{font:600 12px ui-monospace,monospace}
@@ -64,10 +83,11 @@ header{background:var(--panel);border-bottom:1px solid var(--border)}
 .chev{color:var(--muted);transition:transform .15s} .open .chev{transform:rotate(90deg)}
 .cbody{display:none;border-top:1px solid var(--border);background:var(--bg);padding:10px 14px 14px}
 .open .cbody{display:block}
+.note-line{font-size:12px;color:var(--muted);margin-bottom:8px}
 .slidegrp{background:var(--panel);border:1px solid var(--border);border-radius:6px;margin-top:10px}
 .slidegrp:first-child{margin-top:0}
-.sghead{padding:6px 12px;border-bottom:1px solid var(--border);font:600 13px/1.6 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:var(--chip);border-radius:6px 6px 0 0}
-.sghead span{font-family:inherit;font-weight:400;color:var(--muted)}
+.sghead{padding:6px 12px;border-bottom:1px solid var(--border);font:600 13px/1.6 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:var(--chip);border-radius:6px 6px 0 0;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.sghead span.t{font-family:inherit;font-weight:400;color:var(--muted);flex:1}
 .ch{padding:8px 12px;border-top:1px solid var(--border)} .ch:first-of-type{border-top:0}
 .chline{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}
 .badge{font-size:11px;font-weight:600;border-radius:20px;padding:1px 8px;white-space:nowrap}
@@ -75,15 +95,34 @@ header{background:var(--panel);border-bottom:1px solid var(--border)}
 .b-mod{background:var(--mod-bg);color:var(--mod)} .b-fmt{background:var(--fmt-bg);color:var(--fmt)}
 .b-move{background:var(--move-bg);color:var(--move)} .b-note{background:var(--note-bg);color:var(--note)}
 .el{font-weight:600} .det{color:var(--muted)}
-.diff{margin-top:6px;border:1px solid var(--border);border-radius:6px;padding:8px 10px;white-space:pre-wrap;word-break:break-word;font:13px/1.55 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:var(--panel)}
+.diff{margin-top:6px;border:1px solid var(--border);border-radius:6px;padding:8px 10px;white-space:pre-wrap;word-break:break-word;font:13px/1.55 ui-monospace,SFMono-Regular,Menlo,Consolas,"PingFang SC","Microsoft YaHei",monospace;background:var(--panel)}
 .diff del{background:var(--del-bg);color:var(--del);text-decoration:line-through;border-radius:3px}
 .diff ins{background:var(--add-bg);color:var(--add);text-decoration:none;border-radius:3px}
 .diff.all-add{background:var(--add-bg)} .diff.all-del{background:var(--del-bg);text-decoration:line-through;color:var(--del)}
 .linkbtn{border:0;background:none;color:var(--accent);cursor:pointer;padding:0;font-size:12px}
 .empty{padding:40px 20px;text-align:center;color:var(--muted)}
+/* visual compare */
+.cmp{padding:12px;border-bottom:1px solid var(--border);background:var(--bg)}
+.cmp-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media (max-width:700px){.cmp-grid{grid-template-columns:1fr}}
+.cmp-side h4{margin:0 0 6px;font-size:12px;font-weight:600;color:var(--muted);display:flex;justify-content:space-between;gap:8px}
+.frame{position:relative;border:1px solid var(--border);border-radius:6px;overflow:hidden;background:var(--panel)}
+.frame img{display:block;width:100%;height:100%;object-fit:contain}
+.frame .ph{position:absolute;inset:0;display:grid;place-items:center;color:var(--muted);font-size:12px;text-align:center;padding:12px}
+.hl{position:absolute;border:2px solid;border-radius:3px;pointer-events:auto}
+.hl span{position:absolute;top:-1px;left:-1px;transform:translateY(-100%);font:600 10px/1.4 sans-serif;color:#fff;padding:0 4px;border-radius:3px 3px 0 0;white-space:nowrap}
+.hl.add{border-color:var(--add);background:rgba(46,160,67,.12)} .hl.add span{background:var(--add)}
+.hl.del{border-color:var(--del);background:rgba(248,81,73,.12)} .hl.del span{background:var(--del)}
+.hl.mod,.hl.fmt{border-color:#d4a72c;background:rgba(212,167,44,.12)} .hl.mod span,.hl.fmt span{background:#9a6700}
+.hl.move{border-color:var(--move);background:rgba(56,139,253,.1)} .hl.move span{background:var(--move)}
+.hl.from{border-style:dashed;background:none}
+.cmp-legend{display:flex;gap:12px;flex-wrap:wrap;font-size:11px;color:var(--muted);margin-top:8px;align-items:center}
+.cmp-legend i{display:inline-block;width:10px;height:10px;border:2px solid;border-radius:2px;margin-right:4px;vertical-align:-1px}
+/* cards / blame / people */
 .card{background:var(--panel);border:1px solid var(--border);border-radius:6px;margin-bottom:14px}
 .cardh{padding:10px 14px;border-bottom:1px solid var(--border);display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 .cardh .t{font-weight:600;flex:1;min-width:150px}
+.cardb{padding:12px 14px}
 .brow{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 12px;padding:7px 14px;border-top:1px solid var(--border);align-items:center}
 .brow:first-of-type{border-top:0}
 .brow .who{display:flex;align-items:center;gap:6px;color:var(--muted);font-size:12px;justify-content:flex-end;flex-wrap:wrap}
@@ -98,20 +137,64 @@ header{background:var(--panel);border-bottom:1px solid var(--border)}
 .pname{font-weight:600;font-size:16px}
 .stats{display:flex;gap:16px;color:var(--muted);font-size:12px;flex-wrap:wrap}
 .stats b{color:var(--text);font-size:14px}
-.bar{display:flex;height:8px;border-radius:4px;overflow:hidden;background:var(--chip);margin:10px 0 6px}
-.bar i{display:block;height:100%}
-.legend{display:flex;gap:10px;flex-wrap:wrap;font-size:11px;color:var(--muted)}
-.legend span::before{content:"";display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:4px;background:var(--c)}
 .top3{font-size:12px;color:var(--muted);margin-top:8px}
-.grid{display:grid;grid-template-rows:repeat(7,11px);grid-auto-flow:column;grid-auto-columns:11px;gap:3px;overflow-x:auto;padding-bottom:4px}
-.grid i{border-radius:2px;background:var(--g0);outline:1px solid rgba(27,31,36,.06);outline-offset:-1px}
-.grid i.l1{background:var(--g1)} .grid i.l2{background:var(--g2)} .grid i.l3{background:var(--g3)} .grid i.l4{background:var(--g4)}
+/* versions */
+.vrow{display:flex;gap:12px;align-items:center;padding:10px 14px;border-top:1px solid var(--border);flex-wrap:wrap}
+.vrow:first-of-type{border-top:0}
+.vicon{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;background:var(--note-bg);flex:none}
+.vicon.named{background:var(--move-bg)}
+.vmain{flex:1;min-width:180px}
+.vname{font-weight:600}
+.vrow.hilite{background:var(--mod-bg)}
+.savebar{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.savebar input{flex:1;min-width:200px}
+.callout{background:var(--note-bg);border-radius:6px;padding:10px 12px;font-size:13px;color:var(--text)}
+/* stats + charts */
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin:16px 0}
+.kpi{background:var(--panel);border:1px solid var(--border);border-radius:6px;padding:12px 14px}
+.kpi .v{font-size:26px;font-weight:600;line-height:1.1}
+.kpi .k{color:var(--muted);font-size:12px}
+.charts{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.charts .wide{grid-column:1 / -1}
+@media (max-width:800px){.charts{grid-template-columns:1fr}}
+.chart .cardh .t{font-weight:600}
+.legend{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--muted)}
+.legend span{display:inline-flex;align-items:center;gap:5px}
+.legend span i{width:10px;height:10px;border-radius:2px;display:inline-block}
+svg.viz{width:100%;height:auto;display:block}
+svg.viz text{fill:var(--muted);font-size:11px}
+svg.viz .gridl{stroke:var(--grid);stroke-width:1}
+svg.viz .base{stroke:var(--border);stroke-width:1}
+svg.viz .hit{fill:transparent;cursor:default}
+svg.viz .hit:hover{fill:var(--hover);fill-opacity:.6}
+.hb{display:grid;grid-template-columns:minmax(80px,32%) 1fr auto;gap:6px 10px;align-items:center;font-size:13px}
+.hb .lab{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hb .track{display:flex;gap:2px;height:14px;align-items:stretch}
+.hb .track i{display:block;height:100%;min-width:2px}
+.hb .track i:last-child{border-radius:0 4px 4px 0}
+.hb .val{font-variant-numeric:tabular-nums;color:var(--text);font-size:12px;text-align:right}
+table.data{width:100%;border-collapse:collapse;font-size:13px}
+table.data th,table.data td{border-bottom:1px solid var(--border);padding:5px 8px;text-align:left}
+table.data td.n,table.data th.n{text-align:right;font-variant-numeric:tabular-nums}
+#tip{position:fixed;pointer-events:none;background:var(--panel);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:6px 9px;font-size:12px;box-shadow:0 6px 18px rgba(0,0,0,.18);z-index:50;display:none;max-width:260px}
+#tip b{font-weight:600}
+#tip .r{display:flex;gap:8px;justify-content:space-between}
+#tip .r i{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:5px}
+/* welcome + modal */
 .welcome{max-width:640px;margin:40px auto;padding:24px}
 .welcome h2{margin-top:0}
 .welcome input{width:100%;border:1px solid var(--border);background:var(--bg);border-radius:6px;padding:8px 10px;margin:8px 0 12px}
 .welcome ol{padding-left:20px;color:var(--muted)}
 .row{display:flex;gap:8px;flex-wrap:wrap}
 .hidden{display:none!important}
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.45);display:grid;place-items:center;z-index:60;padding:16px}
+.modal{background:var(--panel);border:1px solid var(--border);border-radius:10px;max-width:460px;width:100%;padding:20px;box-shadow:0 20px 50px rgba(0,0,0,.3)}
+.modal h3{margin:0 0 8px}
+.modal label{display:block;font-size:12px;color:var(--muted);margin-top:10px}
+.modal input{width:100%;margin-top:4px}
+.modal .acts{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}
+.modal .msg{font-size:13px;margin-top:10px}
+.modal .msg.err{color:var(--del)}
 footer{color:var(--muted);font-size:12px;text-align:center;padding:30px 0}
 </style>
 </head>
@@ -121,7 +204,14 @@ footer{color:var(--muted);font-size:12px;text-align:center;padding:30px 0}
     <div class="top">
       <div class="logo">⎇</div>
       <div class="deck"><h1 id="deckTitle">Slides Edit History</h1><div class="sub" id="deckSub"></div></div>
-      <button class="btn" data-act="refresh" title="Reload now">⟳ Refresh</button>
+      <div class="menu" id="exportMenu">
+        <button class="btn" data-act="exportMenu">⬇ Export</button>
+        <div class="pop hidden" id="exportPop">
+          <button data-act="export" data-fmt="json">JSON<small>Everything, for backups or code</small></button>
+          <button data-act="export" data-fmt="csv">CSV<small>Opens in Excel / Google Sheets</small></button>
+        </div>
+      </div>
+      <button class="btn" data-act="refresh" title="Reload now">⟳</button>
       <button class="btn" data-act="settings" title="Change data source">⚙</button>
     </div>
     <nav class="tabs" id="tabs"></nav>
@@ -139,7 +229,7 @@ footer{color:var(--muted);font-size:12px;text-align:center;padding:30px 0}
       <option value="mod">Text edits</option>
       <option value="fmt">Formatting</option>
       <option value="move">Moves &amp; sizes</option>
-      <option value="note">Checkpoints</option>
+      <option value="note">Versions &amp; notes</option>
     </select>
     <input id="fQ" type="search" placeholder="Search text, objects, slides…">
     <span id="fEl"></span>
@@ -147,7 +237,9 @@ footer{color:var(--muted);font-size:12px;text-align:center;padding:30px 0}
   <div id="status" class="status"></div>
   <div id="view"></div>
 </main>
-<footer>While this page is open the deck is checked every 10 seconds; otherwise about once a minute. People editing in the same window are listed together.</footer>
+<footer>While this page is open the deck is checked every 10 seconds; otherwise about once a minute.</footer>
+<div id="tip"></div>
+<div id="modalRoot"></div>
 
 <script>
 (function () {
@@ -157,11 +249,14 @@ footer{color:var(--muted);font-size:12px;text-align:center;padding:30px 0}
 const DEFAULT_SOURCE = '';
 
 const LS_KEY = 'slidesEditHistory.src';
-const REFRESH_MS = 10000;   // while this page is open, check the deck every 10 seconds
+const REFRESH_MS = 10000;
 
 const TYPES = {
   TRACKING_STARTED:  ['Tracking started', 'note'],
+  TRACKER_UPDATED:   ['Tracker updated', 'note'],
   CHECKPOINT:        ['Checkpoint', 'note'],
+  VERSION_SAVED:     ['Version saved', 'note'],
+  RESTORED:          ['Restored', 'note'],
   DECK_RENAMED:      ['Renamed', 'mod'],
   SLIDE_ADDED:       ['Slide added', 'add'],
   SLIDE_DELETED:     ['Slide deleted', 'del'],
@@ -180,15 +275,24 @@ const TYPES = {
   ROTATED:           ['Rotated', 'move'],
   GROUPING:          ['Grouping', 'move'],
 };
-const CLS_COLORS = { add: 'var(--add)', del: 'var(--del)', mod: 'var(--mod)', fmt: 'var(--fmt)', move: 'var(--move)', note: 'var(--note)' };
-const CLS_NAMES = { add: 'Added', del: 'Deleted', mod: 'Text', fmt: 'Formatting', move: 'Moves/sizes', note: 'Checkpoints' };
+const INTERNAL = new Set(['IMAGE', 'VERSION_REMOVED']);
+/* chart series: fixed order, validated palette (blue, orange, aqua, yellow, magenta) */
+const SERIES = [
+  { key: 'mod',  name: 'Text edits',   color: 'var(--s1)' },
+  { key: 'del',  name: 'Deletions',    color: 'var(--s2)' },
+  { key: 'add',  name: 'Additions',    color: 'var(--s3)' },
+  { key: 'fmt',  name: 'Formatting',   color: 'var(--s4)' },
+  { key: 'move', name: 'Moves & sizes', color: 'var(--s5)' },
+];
 const TEXT_DIFF_TYPES = new Set(['TEXT_EDITED', 'NOTES_EDITED', 'DECK_RENAMED']);
 
 const state = {
   src: '', demo: false, data: null, tab: 'history',
   f: { editor: '', slide: '', type: '', q: '', element: '' },
-  expanded: new Set(), firstLoad: true, loading: false,
+  expanded: new Set(), compare: new Set(), firstLoad: true, loading: false,
+  statsTable: false, highlightVersion: '', lastRender: 0, busy: false,
 };
+const imgCache = new Map();
 
 /* ---------- helpers ---------- */
 const $ = s => document.querySelector(s);
@@ -197,20 +301,28 @@ const typeOf = c => TYPES[c] || [c ? c.toLowerCase().replace(/_/g, ' ') : 'Chang
 const clsOf = c => typeOf(c)[1];
 const splitPeople = s => String(s || '').split(/\s*,\s*/).filter(Boolean);
 const uniq = a => [...new Set(a)];
-
+const fmtN = n => Number(n).toLocaleString();
+/** Fixes the "?" boxes: Shift+Enter breaks, symbol-font bullets and other invisible characters. */
+function cleanText(s) {
+  return String(s == null ? '' : s)
+    .replace(/\u000b/g, '\n')
+    .replace(/[-]/g, '•')
+    .replace(/[\u0000-\u0008\u000c\u000e-\u001f\u007f￼�]/g, '');
+}
 function hashColor(name) {
   let h = 0;
   for (const ch of String(name)) h = (h * 31 + ch.codePointAt(0)) >>> 0;
   return 'hsl(' + (h % 360) + ' 55% 45%)';
 }
 function initials(name) {
-  const n = String(name || '?').replace(/@.*/, '').trim();
+  const n = String(name || '?').replace(/@.*/, '').replace(/\(.*\)/, '').trim();
   const parts = n.split(/[\s._-]+/).filter(Boolean);
   if (!parts.length) return '?';
   return (parts.length === 1 ? [...parts[0]].slice(0, 2).join('') : [...parts[0]][0] + [...parts[parts.length - 1]][0]).toUpperCase();
 }
 function avatar(name, cls) {
-  return '<span class="av ' + (cls || '') + '" style="background:' + hashColor(name) + '" title="' + esc(name) + '">' + esc(initials(name)) + '</span>';
+  const sys = /^(Automatic|Unknown)$/.test(name);
+  return '<span class="av ' + (cls || '') + (sys ? ' sys' : '') + '" style="background:' + hashColor(name) + '" title="' + esc(name) + '">' + (sys ? '⚙' : esc(initials(name))) + '</span>';
 }
 function ago(t) {
   if (!t) return '';
@@ -224,7 +336,12 @@ function ago(t) {
 const fullTime = t => t ? new Date(t).toLocaleString() : '';
 const dayKey = t => { const d = new Date(t); return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate(); };
 const slideName = r => r.slideNum ? 'Slide ' + r.slideNum : (r.slideId ? 'Slide' : 'Presentation');
-function listNice(arr) { return arr.length <= 1 ? arr.join('') : arr.slice(0, -1).join(', ') + ' & ' + arr[arr.length - 1]; }
+function listNice(arr, word) { return arr.length <= 1 ? arr.join('') : arr.slice(0, -1).join(', ') + ' ' + (word || '&') + ' ' + arr[arr.length - 1]; }
+function attribOf(r) {
+  if (r.attrib) return r.attrib;
+  return r.people.length === 1 ? 'confirmed' : 'shared';   // older edits: derive it
+}
+function parseGeo(g) { try { return g ? JSON.parse(g) : null; } catch (e) { return null; } }
 
 /* ---------- word diff ---------- */
 function tokenize(s) { return String(s).match(/\s+|[A-Za-z0-9_À-ɏ'’]+|[^\s]/gu) || []; }
@@ -253,12 +370,8 @@ function diffWords(a, b) {
     while (j < m) ops.push(['+', b2[j++]]);
   }
   if (e) ops.push(['=', A.slice(A.length - e).join('')]);
-  // merge neighbours; fold lone spaces between two edits into the edits
   const merged = [];
-  ops.forEach(o => {
-    const last = merged[merged.length - 1];
-    if (last && last[0] === o[0]) last[1] += o[1]; else merged.push(o.slice());
-  });
+  ops.forEach(o => { const last = merged[merged.length - 1]; if (last && last[0] === o[0]) last[1] += o[1]; else merged.push(o.slice()); });
   return merged;
 }
 function renderDiff(before, after) {
@@ -268,19 +381,44 @@ function renderDiff(before, after) {
 
 /* ---------- data ---------- */
 function prepare(j) {
-  const rows = (j.rows || []).map((r, i) => Object.assign({}, r, {
+  const all = (j.rows || []).map((r, i) => Object.assign({}, r, {
     idx: i, t: Date.parse(r.time) || 0, people: splitPeople(r.editors),
+    before: cleanText(r.before), after: cleanText(r.after), details: cleanText(r.details),
+    element: cleanText(r.element), slideTitle: cleanText(r.slideTitle),
   }));
-  rows.sort((a, b) => a.t - b.t || a.idx - b.idx);
+  // pictures per slide, in log order
+  const images = new Map();
+  all.filter(r => r.change === 'IMAGE').forEach(r => {
+    if (!images.has(r.slideId)) images.set(r.slideId, []);
+    images.get(r.slideId).push({ idx: r.idx, t: r.t, id: r.details });
+  });
+  // saved versions
+  const removed = new Set(all.filter(r => r.change === 'VERSION_REMOVED').map(r => r.elementId));
+  const versions = all.filter(r => r.change === 'VERSION_SAVED').map(r => ({
+    id: r.elementId, name: r.details, kind: r.before || 'auto', t: r.t, idx: r.idx, by: r.editors, commit: r.commit, gone: removed.has(r.elementId),
+  }));
+  const rows = all.filter(r => !INTERNAL.has(r.change));
   const map = new Map();
   rows.forEach(r => {
     const k = r.commit || ('row' + r.idx);
-    if (!map.has(k)) map.set(k, { id: k, t: r.t, people: r.people, changes: [] });
+    if (!map.has(k)) map.set(k, { id: k, t: r.t, people: r.people, attrib: attribOf(r), changes: [] });
     map.get(k).changes.push(r);
   });
-  const commits = [...map.values()].sort((a, b) => b.t - a.t);
-  const people = uniq(rows.flatMap(r => r.people)).sort((a, b) => a.localeCompare(b));
-  return { deck: j.deck || {}, generated: j.generated, lastChecked: j.lastChecked, rows, commits, people, current: j.current || [] };
+  const commits = [...map.values()].sort((a, b) => a.t - b.t || a.changes[0].idx - b.changes[0].idx);
+  // a version saved right after a commit (before any other edit) = "restore to this point"
+  let lastEdit = null;
+  commits.forEach(c => {
+    c.minIdx = Math.min(...c.changes.map(x => x.idx)); c.maxIdx = Math.max(...c.changes.map(x => x.idx));
+    const v = c.changes.find(x => x.change === 'VERSION_SAVED');
+    c.version = v ? versions.find(x => x.idx === v.idx) : null;
+    if (c.version) { if (lastEdit && !lastEdit.restorePoint && !c.version.gone) lastEdit.restorePoint = c.version; }
+    else if (!c.changes.every(x => clsOf(x.change) === 'note')) lastEdit = c;
+  });
+  commits.reverse();
+  const people = uniq(rows.filter(r => clsOf(r.change) !== 'note').flatMap(r => r.people))
+    .filter(p => !/^(Automatic|Unknown)$/.test(p)).sort((a, b) => a.localeCompare(b));
+  return { deck: j.deck || {}, generated: j.generated, lastChecked: j.lastChecked, webActions: !!j.webActions,
+           all, rows, commits, people, images, versions, current: j.current || [] };
 }
 
 function matches(r) {
@@ -297,9 +435,13 @@ function matches(r) {
 }
 
 function commitTitle(c) {
+  const v = c.changes.find(x => x.change === 'VERSION_SAVED');
+  if (v) return (v.before === 'named' ? '📌 Saved version “' : v.before === 'pre-restore' ? '🛟 Safety copy: “' : '⏱ Auto-saved version “') + v.details + '”';
+  const rs = c.changes.find(x => x.change === 'RESTORED');
+  if (rs) return '↩ ' + rs.details;
   const cp = c.changes.find(x => x.change === 'CHECKPOINT');
   if (cp) return '★ ' + cp.details;
-  const ts = c.changes.find(x => x.change === 'TRACKING_STARTED');
+  const ts = c.changes.find(x => x.change === 'TRACKING_STARTED' || x.change === 'TRACKER_UPDATED');
   if (ts) return ts.details || 'Started tracking';
   const n = {};
   c.changes.forEach(x => { n[x.change] = (n[x.change] || 0) + 1; });
@@ -328,6 +470,16 @@ function commitTitle(c) {
   return t.charAt(0).toUpperCase() + t.slice(1);
 }
 
+function whoLine(people, attrib) {
+  const names = people.length ? people : ['Unknown'];
+  if (attrib === 'shared' && names.length > 1)
+    return '<b>' + esc(listNice(names, 'or')) + '</b><span class="conf share" title="Several people edited during the same check window, so we can’t tell which of them made each change.">same time window</span>';
+  if (attrib === 'probable')
+    return '<b>' + esc(names.join(', ')) + '</b><span class="conf prob" title="Google hadn’t listed this edit yet; this is the most recent editor.">probably</span>';
+  if (/^(Automatic|Unknown)$/.test(names[0])) return '<b>' + esc(names[0]) + '</b>';
+  return '<b>' + esc(listNice(names)) + '</b><span class="conf ok" title="Only this person edited during this window.">✓ confirmed</span>';
+}
+
 /* ---------- loading ---------- */
 function getSource() {
   const qs = new URLSearchParams(location.search);
@@ -337,31 +489,44 @@ function getSource() {
   return DEFAULT_SOURCE;
 }
 function saveSource(s) { try { localStorage.setItem(LS_KEY, s); } catch (e) {} }
+const withParams = (u, p) => u + (u.includes('?') ? '&' : '?') + p;
 
-async function load() {
+async function getJSON(url) {
+  const res = await fetch(url, { redirect: 'follow' });
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  const text = await res.text();
+  let j;
+  try { j = JSON.parse(text); }
+  catch (e) { throw new Error('The URL didn’t return history data. Check the web app is deployed with “Who has access: Anyone”.'); }
+  if (j.error) throw new Error(j.error);
+  return j;
+}
+async function postJSON(body) {
+  if (state.demo) { await new Promise(r => setTimeout(r, 700)); return demoAction(body); }
+  const res = await fetch(state.src, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(body), redirect: 'follow' });
+  const j = JSON.parse(await res.text());
+  if (j.error) throw new Error(j.error);
+  return j;
+}
+
+async function load(force) {
   if (state.loading) return;
-  if (state.src === 'demo') { state.demo = true; state.data = prepare(demoData()); setStatus('Showing demo data.'); render(); return; }
+  if (state.src === 'demo') {
+    state.demo = true;
+    if (!state.data) state.data = prepare(demoData());
+    setStatus('Showing demo data — nothing here is real, and restoring is simulated.');
+    render(); return;
+  }
   if (!state.src) { renderWelcome(); return; }
   state.loading = true;
   if (!state.data) setStatus('Loading history…');
   try {
-    const url = state.src + (state.src.includes('?') ? '&' : '?') + 'check=1&_=' + Date.now();
-    const res = await fetch(url, { redirect: 'follow' });
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    const text = await res.text();
-    let j;
-    try { j = JSON.parse(text); }
-    catch (e) { throw new Error('The URL didn’t return history data. Check the web app is deployed with “Who has access: Anyone”.'); }
-    if (j.error) throw new Error(j.error);
+    const j = await getJSON(withParams(state.src, 'check=1&_=' + Date.now()));
     const prev = state.data;
     state.data = prepare(j);
     if (j.checkError) setStatus('Live check failed: ' + j.checkError, true);
     else setStatus('Live · checked ' + new Date().toLocaleTimeString() + ' · updates every ' + (REFRESH_MS / 1000) + 's');
-    // only redraw when something actually changed, so the page doesn't flicker
-    if (!prev || prev.rows.length !== state.data.rows.length || Date.now() - (state.lastRender || 0) > 60000) {
-      render();
-      state.lastRender = Date.now();
-    }
+    if (force || !prev || prev.all.length !== state.data.all.length || Date.now() - state.lastRender > 60000) render();
   } catch (err) {
     const msg = (err && err.message) || String(err);
     setStatus('Couldn’t load: ' + (msg === 'Failed to fetch' ? 'network error, or the web app isn’t shared with “Anyone”.' : msg), true);
@@ -372,28 +537,47 @@ async function load() {
 }
 function setStatus(t, err) { const el = $('#status'); el.textContent = t; el.className = 'status' + (err ? ' err' : ''); }
 
+/* ---------- slide pictures ---------- */
+function loadImage(id) {
+  if (imgCache.has(id)) return imgCache.get(id);
+  const p = state.demo ? Promise.resolve(demoImage(id))
+    : getJSON(withParams(state.src, 'action=image&id=' + encodeURIComponent(id))).then(j => j.data);
+  imgCache.set(id, p);
+  p.catch(() => imgCache.delete(id));
+  return p;
+}
+function fillImages(root) {
+  (root || document).querySelectorAll('img[data-img]').forEach(img => {
+    if (img.dataset.done) return;
+    img.dataset.done = '1';
+    loadImage(img.dataset.img).then(src => { img.src = src; img.nextElementSibling && img.nextElementSibling.classList.contains('ph') && img.nextElementSibling.remove(); })
+      .catch(e => { const ph = img.nextElementSibling; if (ph) ph.textContent = 'Couldn’t load picture: ' + e.message; });
+  });
+}
+
 /* ---------- rendering ---------- */
 function render() {
   const d = state.data;
   if (!d) return;
+  state.lastRender = Date.now();
   $('#deckTitle').innerHTML = d.deck.url
     ? '<a href="' + esc(d.deck.url) + '" target="_blank" rel="noopener">' + esc(d.deck.title || 'Untitled deck') + '</a>'
     : esc(d.deck.title || 'Slides Edit History');
-  const realCommits = d.commits.filter(c => !c.changes.every(x => x.change === 'TRACKING_STARTED'));
+  const edits = d.rows.filter(r => clsOf(r.change) !== 'note').length;
   $('#deckSub').textContent = d.rows.length
-    ? realCommits.length + ' saves · ' + d.rows.length + ' changes · ' + d.people.length + ' contributor' + (d.people.length === 1 ? '' : 's') + (state.demo ? ' · demo' : '')
+    ? fmtN(edits) + ' changes · ' + d.versions.filter(v => !v.gone).length + ' saved versions · ' + d.people.length + ' contributor' + (d.people.length === 1 ? '' : 's') + (state.demo ? ' · demo' : '')
     : 'No changes logged yet';
   renderTabs();
   renderFilters();
   $('#filters').classList.toggle('hidden', state.tab !== 'history');
-  if (state.tab === 'history') renderHistory();
-  else if (state.tab === 'blame') renderBlame();
-  else renderPeople();
+  ({ history: renderHistory, versions: renderVersions, blame: renderBlame, people: renderPeople, stats: renderStats })[state.tab]();
+  fillImages();
 }
 
 function renderTabs() {
   const d = state.data;
-  const tabs = [['history', 'History', d.commits.length], ['blame', 'Blame', d.current.length || ''], ['people', 'Contributors', d.people.length]];
+  const tabs = [['history', 'History', d.commits.length], ['versions', 'Versions', d.versions.filter(v => !v.gone).length],
+                ['blame', 'Blame', d.current.length || ''], ['people', 'Contributors', d.people.length], ['stats', 'Stats', '']];
   $('#tabs').innerHTML = tabs.map(([k, label, n]) =>
     '<button class="tab' + (state.tab === k ? ' on' : '') + '" data-act="tab" data-tab="' + k + '">' + label +
     (n !== '' ? '<span class="n">' + n + '</span>' : '') + '</button>').join('');
@@ -403,9 +587,8 @@ function renderFilters() {
   const d = state.data, f = state.f;
   $('#fEditor').innerHTML = '<option value="">All editors</option>' +
     d.people.map(p => '<option' + (p === f.editor ? ' selected' : '') + '>' + esc(p) + '</option>').join('');
-  const slides = [];
-  const seen = new Set();
-  d.current.forEach(s => { seen.add(s.id); slides.push([s.id, 'Slide ' + s.num + ' · ' + s.title]); });
+  const slides = [], seen = new Set();
+  d.current.forEach(s => { seen.add(s.id); slides.push([s.id, 'Slide ' + s.num + ' · ' + cleanText(s.title)]); });
   const lastBySlide = new Map();
   d.rows.forEach(r => { if (r.slideId) lastBySlide.set(r.slideId, r); });
   lastBySlide.forEach((r, id) => {
@@ -423,13 +606,10 @@ function renderFilters() {
 
 function renderHistory() {
   const d = state.data;
-  if (!d.rows.length) {
-    $('#view').innerHTML = '<div class="box empty">No changes yet. Edit the deck, wait about a minute, then refresh.</div>';
-    return;
-  }
+  if (!d.rows.length) { $('#view').innerHTML = '<div class="box empty">No changes yet. Edit the deck, wait a few seconds, then refresh.</div>'; return; }
   const commits = d.commits.map(c => Object.assign({}, c, { shown: c.changes.filter(matches) })).filter(c => c.shown.length);
   if (!commits.length) { $('#view').innerHTML = '<div class="box empty">Nothing matches these filters.</div>'; return; }
-  if (state.firstLoad) { state.expanded.add(commits[0].id); state.firstLoad = false; }
+  if (state.firstLoad) { const first = commits.find(c => !c.version); if (first) state.expanded.add(first.id); state.firstLoad = false; }
 
   let html = '', curDay = '';
   commits.forEach(c => {
@@ -445,37 +625,47 @@ function renderHistory() {
   $('#view').innerHTML = html;
 }
 
+function restoreBtn(v, label) {
+  if (!v || v.gone) return '';
+  return '<button class="btn sm" data-act="restore" data-id="' + esc(v.id) + '"' +
+    (state.data.webActions || state.demo ? '' : ' disabled title="Set ADMIN_PASSWORD in Code.gs to restore from here, or use Edit History → Restore a version… in the deck"') +
+    '>↩ ' + esc(label || 'Restore') + '</button>';
+}
+
 function renderCommit(c) {
   const open = state.expanded.has(c.id);
+  const isVer = !!c.version;
   const add = c.shown.filter(x => clsOf(x.change) === 'add').length;
   const del = c.shown.filter(x => clsOf(x.change) === 'del').length;
-  const mod = c.shown.length - add - del;
+  const mod = c.shown.filter(x => clsOf(x.change) !== 'note').length - add - del;
   const people = c.people.length ? c.people : ['Unknown'];
-  let h = '<div class="commit' + (open ? ' open' : '') + '">' +
-    '<button class="chead" data-act="toggle" data-commit="' + esc(c.id) + '">' +
-      '<span class="avs">' + people.slice(0, 3).map(p => avatar(p)).join('') + '</span>' +
+  const unsure = c.attrib !== 'confirmed';
+  let h = '<div class="commit' + (open ? ' open' : '') + (isVer ? ' ver' : '') + '">' +
+    '<div class="chead" role="button" tabindex="0" data-act="toggle" data-commit="' + esc(c.id) + '">' +
+      '<span class="avs">' + people.slice(0, 3).map(p => avatar(p, unsure ? 'unsure' : '')).join('') + '</span>' +
       '<span class="cmain"><div class="ctitle">' + esc(commitTitle(c)) + '</div>' +
-      '<div class="cmeta"><b>' + esc(listNice(people)) + '</b> · <span title="' + esc(fullTime(c.t)) + '">' + esc(ago(c.t)) + '</span>' +
-      (people.length > 1 ? ' · edited together' : '') + '</div></span>' +
+      '<div class="cmeta">' + whoLine(people, c.attrib) + ' · <span title="' + esc(fullTime(c.t)) + '">' + esc(ago(c.t)) + '</span></div></span>' +
       '<span class="cright">' +
+        (isVer ? restoreBtn(c.version) : '') +
         (add ? '<span class="cnt add">+' + add + '</span>' : '') +
         (del ? '<span class="cnt del">−' + del + '</span>' : '') +
-        (mod ? '<span class="cnt mod">~' + mod + '</span>' : '') +
-        '<span class="sha">' + esc(c.id.slice(0, 7)) + '</span><span class="chev">›</span>' +
+        (mod > 0 ? '<span class="cnt mod">~' + mod + '</span>' : '') +
+        '<span class="sha">' + esc(c.id.slice(0, 7)) + '</span>' + (isVer ? '' : '<span class="chev">›</span>') +
       '</span>' +
-    '</button><div class="cbody">';
-  if (open) {
+    '</div><div class="cbody">';
+  if (open && !isVer) {
+    if (c.restorePoint) h += '<div class="note-line">A version was saved right after this: ' + restoreBtn(c.restorePoint, 'Restore the whole deck to this point') + '</div>';
+    if (c.attrib === 'shared') h += '<div class="note-line">⚠ ' + esc(listNice(people, 'and')) + ' were all editing during the same check window, so these changes can’t be split between them.</div>';
     const groups = new Map();
-    c.shown.forEach(x => {
-      const k = x.slideId || '_deck';
-      if (!groups.has(k)) groups.set(k, []);
-      groups.get(k).push(x);
-    });
-    groups.forEach(list => {
+    c.shown.forEach(x => { const k = x.slideId || '_deck'; if (!groups.has(k)) groups.set(k, []); groups.get(k).push(x); });
+    groups.forEach((list, sid) => {
       const r = list[0];
+      const key = c.id + '|' + sid;
+      const canCompare = sid !== '_deck' && list.some(x => clsOf(x.change) !== 'note');
       h += '<div class="slidegrp"><div class="sghead">' + esc(slideName(r)) +
-        (r.slideTitle ? ' <span>— ' + esc(r.slideTitle) + '</span>' : '') + '</div>' +
-        list.map(renderChange).join('') + '</div>';
+        '<span class="t">' + (r.slideTitle ? '— ' + esc(r.slideTitle) : '') + '</span>' +
+        (canCompare ? '<button class="btn sm" data-act="compare" data-key="' + esc(key) + '">' + (state.compare.has(key) ? 'Hide pictures' : '🖼 Compare visually') + '</button>' : '') +
+        '</div>' + (state.compare.has(key) ? renderCompare(c, sid, list) : '') + list.map(renderChange).join('') + '</div>';
     });
   }
   return h + '</div></div>';
@@ -485,9 +675,8 @@ function renderChange(x) {
   const [label, cls] = typeOf(x.change);
   let h = '<div class="ch"><div class="chline"><span class="badge b-' + cls + '">' + esc(label) + '</span>';
   if (x.element) h += '<span class="el">' + esc(x.element) + '</span>';
-  if (x.details && x.change !== 'CHECKPOINT') h += '<span class="det">' + esc(x.details) + '</span>';
-  if (x.change === 'CHECKPOINT') h += '<span>' + esc(x.details) + '</span>';
-  if (x.elementId) h += '<button class="linkbtn" data-act="elHistory" data-el="' + esc(x.elementId) + '">history</button>';
+  if (x.details) h += '<span class="' + (cls === 'note' ? '' : 'det') + '">' + esc(x.details) + '</span>';
+  if (x.elementId && cls !== 'note') h += '<button class="linkbtn" data-act="elHistory" data-el="' + esc(x.elementId) + '">history</button>';
   h += '</div>';
   if (TEXT_DIFF_TYPES.has(x.change) && (x.before || x.after)) h += renderDiff(x.before, x.after);
   else if ((x.change === 'ELEMENT_ADDED' || x.change === 'SLIDE_ADDED') && x.after) h += '<div class="diff all-add">' + esc(x.after) + '</div>';
@@ -495,10 +684,71 @@ function renderChange(x) {
   return h + '</div>';
 }
 
+/* Before/after pictures with the changed objects outlined */
+function renderCompare(c, slideId, list) {
+  const d = state.data;
+  const imgs = d.images.get(slideId) || [];
+  const before = [...imgs].reverse().find(i => i.idx < c.minIdx);
+  const after = imgs.find(i => i.idx > c.maxIdx);
+  const added = list.some(x => x.change === 'SLIDE_ADDED'), deleted = list.some(x => x.change === 'SLIDE_DELETED');
+  const W = d.deck.pageW || 720, H = d.deck.pageH || 405;
+  const boxes = { b: [], a: [] };
+  list.forEach(x => {
+    const g = parseGeo(x.geo); if (!g) return;
+    const cls = clsOf(x.change), lab = typeOf(x.change)[0];
+    if (cls === 'move') { if (g.b) boxes.b.push([g.b, 'move from', lab + ' (was here)']); if (g.a) boxes.a.push([g.a, 'move', lab]); }
+    else if (cls === 'del') { if (g.b) boxes.b.push([g.b, 'del', lab]); }
+    else if (cls === 'add') { if (g.a) boxes.a.push([g.a, 'add', lab]); }
+    else { if (g.b) boxes.b.push([g.b, cls, lab]); if (g.a) boxes.a.push([g.a, cls, lab]); }
+  });
+  const dedupe = arr => { const seen = new Map(); arr.forEach(b => { const k = b[0].join(',') + b[1]; if (!seen.has(k)) seen.set(k, b); else seen.get(k)[2] += ' + ' + b[2]; }); return [...seen.values()]; };
+  const overlay = arr => dedupe(arr).map(([g, cls, lab]) =>
+    '<div class="hl ' + cls + '" title="' + esc(lab) + '" style="left:' + (g[0] / W * 100) + '%;top:' + (g[1] / H * 100) + '%;width:' + Math.max(1, g[2] / W * 100) + '%;height:' + Math.max(1, g[3] / H * 100) + '%"><span>' + esc(lab) + '</span></div>').join('');
+  const frame = (img, arr, emptyText) => '<div class="frame" style="aspect-ratio:' + W + '/' + H + '">' +
+    (img ? '<img data-img="' + esc(img.id) + '" alt=""><div class="ph">Loading picture…</div>' + overlay(arr) : '<div class="ph">' + emptyText + '</div>') + '</div>';
+  return '<div class="cmp"><div class="cmp-grid">' +
+    '<div class="cmp-side"><h4><span>Before</span><span>' + (before ? esc(ago(before.t)) : '') + '</span></h4>' +
+      frame(before, boxes.b, added ? 'This slide didn’t exist yet.' : 'No earlier picture of this slide (pictures start when tracking is updated).') + '</div>' +
+    '<div class="cmp-side"><h4><span>After</span><span>' + (after ? esc(ago(after.t)) : '') + '</span></h4>' +
+      frame(after, boxes.a, deleted ? 'This slide was deleted.' : 'The picture is taken within about a minute of the change — check back shortly.') + '</div>' +
+    '</div><div class="cmp-legend"><span><i style="border-color:var(--add)"></i>added</span><span><i style="border-color:var(--del)"></i>deleted</span>' +
+    '<span><i style="border-color:#d4a72c"></i>edited / formatted</span><span><i style="border-color:var(--move)"></i>moved / resized (dashed = old spot)</span>' +
+    '<span>Pictures are taken at most once a minute per slide, so “after” can include a few later edits.</span></div></div>';
+}
+
+/* ---------- Versions ---------- */
+function renderVersions() {
+  const d = state.data;
+  const list = d.versions.filter(v => !v.gone).slice().reverse();
+  const can = d.webActions || state.demo;
+  let html = '<div class="card" style="margin-top:16px"><div class="cardh"><span class="t">Save a named version</span></div><div class="cardb">' +
+    (can
+      ? '<div class="savebar"><input class="field" id="verName" maxlength="100" placeholder="e.g. Before Competition, Final Robot Design, Notebook Complete"><button class="btn primary" data-act="saveVersion">📌 Save version</button></div>' +
+        '<p class="never" style="margin:8px 0 0">Saves a full copy of the deck right now. You can restore the whole presentation to it later.</p>'
+      : '<div class="callout">Saving and restoring from this page is turned off. In the deck use <b>Edit History → Save a named version…</b> and <b>Restore a version…</b>, ' +
+        'or set <code>ADMIN_PASSWORD</code> in Code.gs and deploy a new version to turn these buttons on.</div>') +
+    '</div></div>';
+  html += '<div class="card"><div class="cardh"><span class="t">Saved versions</span><span class="never">Named versions are kept forever; automatic ones are saved every ~30 min while people edit.</span></div>';
+  if (!list.length) html += '<div class="empty">No saved versions yet.</div>';
+  list.forEach(v => {
+    const icon = v.kind === 'named' ? '📌' : v.kind === 'pre-restore' ? '🛟' : '⏱';
+    const kind = v.kind === 'named' ? 'Named version' : v.kind === 'pre-restore' ? 'Safety copy made before a restore' : 'Automatic';
+    html += '<div class="vrow' + (state.highlightVersion === v.id ? ' hilite' : '') + '"><span class="vicon' + (v.kind === 'named' ? ' named' : '') + '">' + icon + '</span>' +
+      '<div class="vmain"><div class="vname">' + esc(v.name) + '</div><div class="never">' + kind + ' · ' + esc(fullTime(v.t)) + ' (' + esc(ago(v.t)) + ')' +
+      (v.by && v.by !== 'Automatic' ? ' · by ' + esc(v.by) : '') + '</div></div>' +
+      (state.demo ? '' : '<a class="btn sm" href="https://docs.google.com/presentation/d/' + encodeURIComponent(v.id) + '/edit" target="_blank" rel="noopener" title="Opens the saved copy (only the deck owner can open it)">Open copy</a>') +
+      restoreBtn(v) + '</div>';
+  });
+  html += '</div><p class="status">Restoring replaces every slide in the deck (same file and link). The current state is saved first as a 🛟 safety copy, so you can undo a restore. Google’s own File → Version history still works too.</p>';
+  $('#view').innerHTML = html;
+}
+
+/* ---------- Blame ---------- */
 function renderBlame() {
   const d = state.data;
+  const rows = d.rows.filter(r => clsOf(r.change) !== 'note');
   const lastEl = new Map(), countEl = new Map(), lastSlide = new Map(), created = new Map(), notes = new Map();
-  d.rows.forEach(r => {
+  rows.forEach(r => {
     if (r.elementId) { lastEl.set(r.elementId, r); countEl.set(r.elementId, (countEl.get(r.elementId) || 0) + 1); }
     if (r.slideId) {
       lastSlide.set(r.slideId, r);
@@ -507,14 +757,14 @@ function renderBlame() {
     }
   });
   const who = r => r
-    ? '<span class="who">' + r.people.slice(0, 2).map(p => avatar(p)).join('') + '<b>' + esc(listNice(r.people)) + '</b> · ' +
+    ? '<span class="who">' + r.people.slice(0, 2).map(p => avatar(p, attribOf(r) !== 'confirmed' ? 'unsure' : '')).join('') + whoLine(r.people, attribOf(r)) + ' · ' +
       '<span class="badge b-' + clsOf(r.change) + '">' + esc(typeOf(r.change)[0]) + '</span> · <span title="' + esc(fullTime(r.t)) + '">' + esc(ago(r.t)) + '</span></span>'
     : '<span class="who never">unchanged since tracking started</span>';
 
   let slides = d.current;
-  if (!slides.length) {   // older web app without "current": rebuild from the log
+  if (!slides.length) {
     const tmp = new Map();
-    d.rows.forEach(r => {
+    rows.forEach(r => {
       if (!r.slideId) return;
       if (r.change === 'SLIDE_DELETED') { tmp.delete(r.slideId); return; }
       const s = tmp.get(r.slideId) || { id: r.slideId, elements: new Map() };
@@ -526,25 +776,26 @@ function renderBlame() {
   }
   if (!slides.length) { $('#view').innerHTML = '<div class="box empty" style="margin-top:16px">No slides to show yet.</div>'; return; }
 
-  let html = '<p class="status" style="padding-top:16px">Who last touched each slide and object, like <code>git blame</code>. Click “history” to see every change to an object.</p>';
+  let html = '<p class="status" style="padding-top:16px">Who last touched each slide and object, like <code>git blame</code>. Dashed avatars = not confirmed (several people were editing at once).</p>';
   slides.forEach(s => {
     const last = lastSlide.get(s.id), cr = created.get(s.id);
-    html += '<div class="card"><div class="cardh"><span class="t">Slide ' + s.num + ' — ' + esc(s.title) + '</span>' +
+    const imgs = d.images.get(s.id) || [];
+    html += '<div class="card"><div class="cardh"><span class="t">Slide ' + s.num + ' — ' + esc(cleanText(s.title)) + '</span>' +
       '<span class="never">' + (cr ? 'created by <b>' + esc(listNice(cr.people)) + '</b> ' + esc(ago(cr.t)) + ' · ' : '') +
       (last ? 'last change ' + esc(ago(last.t)) : 'no changes yet') + '</span>' +
       '<button class="linkbtn" data-act="slideHistory" data-slide="' + esc(s.id) + '">history</button></div>';
-    const els = s.elements || [];
-    els.forEach(e => {
+    (s.elements || []).forEach(e => {
       const r = lastEl.get(e.id), n = countEl.get(e.id) || 0;
-      html += '<div class="brow' + (e.parent ? ' child' : '') + '"><span class="lbl" title="' + esc(e.label) + '">' + esc(e.label) +
+      html += '<div class="brow' + (e.parent ? ' child' : '') + '"><span class="lbl" title="' + esc(cleanText(e.label)) + '">' + esc(cleanText(e.label)) +
         (n ? ' <button class="linkbtn" data-act="elHistory" data-el="' + esc(e.id) + '">history (' + n + ')</button>' : '') + '</span>' + who(r) + '</div>';
     });
     if (notes.has(s.id)) html += '<div class="brow"><span class="lbl">Speaker notes</span>' + who(notes.get(s.id)) + '</div>';
-    if (!els.length && !notes.has(s.id)) html += '<div class="brow"><span class="lbl never">Empty slide</span><span></span></div>';
+    if (!(s.elements || []).length && !notes.has(s.id)) html += '<div class="brow"><span class="lbl never">Empty slide</span><span></span></div>';
     html += '</div>';
+    void imgs;
   });
   const currentIds = new Set(slides.map(s => s.id));
-  const deleted = d.rows.filter(r => r.change === 'SLIDE_DELETED' && !currentIds.has(r.slideId));
+  const deleted = rows.filter(r => r.change === 'SLIDE_DELETED' && !currentIds.has(r.slideId));
   if (deleted.length) {
     html += '<div class="card"><div class="cardh"><span class="t">Deleted slides</span></div>' +
       deleted.slice().reverse().map(r => '<div class="brow"><span class="lbl">' + esc(r.slideTitle || '(untitled)') +
@@ -553,52 +804,238 @@ function renderBlame() {
   $('#view').innerHTML = html;
 }
 
-function renderPeople() {
+/* ---------- Contributors ---------- */
+function perPerson() {
   const d = state.data;
-  const rows = d.rows.filter(r => r.change !== 'TRACKING_STARTED');
-  // activity grid: last 16 weeks
-  const days = new Map();
-  rows.forEach(r => { const k = dayKey(r.t); days.set(k, (days.get(k) || 0) + 1); });
-  const max = Math.max(1, ...days.values());
-  const today = new Date(); today.setHours(0, 0, 0, 0);
-  const start = new Date(today);
-  start.setDate(start.getDate() - (7 * 16 - 1));
-  start.setDate(start.getDate() - start.getDay());   // back up to Sunday
-  let grid = '';
-  for (const dt = new Date(start); dt <= today; dt.setDate(dt.getDate() + 1)) {
-    const n = days.get(dayKey(dt.getTime())) || 0;
-    const lvl = n === 0 ? 0 : Math.min(4, Math.ceil((n / max) * 4));
-    grid += '<i class="l' + lvl + '" title="' + n + ' change' + (n === 1 ? '' : 's') + ' on ' + dt.toLocaleDateString() + '"></i>';
-  }
-
   const per = new Map();
-  rows.forEach(r => r.people.forEach(p => {
-    if (!per.has(p)) per.set(p, { name: p, n: 0, commits: new Set(), slides: new Map(), first: r.t, last: r.t, cls: {} });
-    const o = per.get(p);
-    o.n++; o.commits.add(r.commit); o.last = Math.max(o.last, r.t); o.first = Math.min(o.first, r.t);
-    if (r.slideId) o.slides.set(r.slideId, { n: ((o.slides.get(r.slideId) || {}).n || 0) + 1, label: slideName(r) + ' “' + r.slideTitle + '”' });
-    const c = clsOf(r.change); o.cls[c] = (o.cls[c] || 0) + 1;
-  }));
-  const list = [...per.values()].sort((a, b) => b.n - a.n);
-  const top = Math.max(1, ...list.map(p => p.n));
+  d.rows.filter(r => clsOf(r.change) !== 'note').forEach(r => {
+    const a = attribOf(r);
+    r.people.filter(p => !/^(Automatic|Unknown)$/.test(p)).forEach(p => {
+      if (!per.has(p)) per.set(p, { name: p, n: 0, confirmed: 0, shared: 0, probable: 0, commits: new Set(), slides: new Map(), first: r.t, last: r.t, cls: {} });
+      const o = per.get(p);
+      o.n++; o[a === 'confirmed' ? 'confirmed' : a === 'probable' ? 'probable' : 'shared']++;
+      o.commits.add(r.commit); o.last = Math.max(o.last, r.t); o.first = Math.min(o.first, r.t);
+      if (r.slideId) o.slides.set(r.slideId, { n: ((o.slides.get(r.slideId) || {}).n || 0) + 1, label: slideName(r) + ' “' + r.slideTitle + '”' });
+      const c = clsOf(r.change); o.cls[c] = (o.cls[c] || 0) + 1;
+    });
+  });
+  return [...per.values()].sort((a, b) => b.n - a.n);
+}
 
-  let html = '<div class="card" style="margin-top:16px"><div class="cardh"><span class="t">Activity — last 16 weeks</span><span class="never">' + rows.length + ' changes</span></div><div style="padding:12px 14px"><div class="grid">' + grid + '</div></div></div>';
+function renderPeople() {
+  const list = perPerson();
+  let html = '<p class="status" style="padding-top:16px"><b>Confirmed</b> = they were the only person editing in that check window. ' +
+    '<b>Same window</b> = several people were editing at once, so it might have been any of them.</p>';
   if (!list.length) html += '<div class="box empty">No contributions yet.</div>';
   html += '<div class="people">' + list.map(p => {
-    const segs = Object.keys(CLS_COLORS).filter(k => p.cls[k]).map(k =>
-      '<i style="width:' + (p.cls[k] / top * 100) + '%;background:' + CLS_COLORS[k] + '" title="' + CLS_NAMES[k] + ': ' + p.cls[k] + '"></i>').join('');
-    const leg = Object.keys(CLS_COLORS).filter(k => p.cls[k]).map(k =>
-      '<span style="--c:' + CLS_COLORS[k] + '">' + CLS_NAMES[k] + ' ' + p.cls[k] + '</span>').join('');
     const topSlides = [...p.slides.values()].sort((a, b) => b.n - a.n).slice(0, 3).map(s => esc(s.label) + ' (' + s.n + ')').join(', ');
+    const max = Math.max(1, p.n);
     return '<div class="card person"><div class="phead">' + avatar(p.name, 'big') + '<div><div class="pname">' + esc(p.name) + '</div>' +
       '<div class="never">active ' + esc(ago(p.first)) + ' → ' + esc(ago(p.last)) + '</div></div></div>' +
-      '<div class="stats"><span><b>' + p.n + '</b> changes</span><span><b>' + p.commits.size + '</b> saves</span><span><b>' + p.slides.size + '</b> slides</span></div>' +
-      '<div class="bar">' + segs + '</div><div class="legend">' + leg + '</div>' +
+      '<div class="stats"><span><b>' + p.confirmed + '</b> confirmed</span><span><b>' + (p.shared + p.probable) + '</b> same window / probable</span><span><b>' + p.slides.size + '</b> slides</span></div>' +
+      '<div class="hb" style="grid-template-columns:1fr;margin:10px 0 4px"><div class="track">' +
+        (p.confirmed ? '<i style="width:' + (p.confirmed / max * 100) + '%;background:var(--s1)" data-tip="<b>' + p.confirmed + '</b> confirmed changes"></i>' : '') +
+        (p.shared + p.probable ? '<i style="width:' + ((p.shared + p.probable) / max * 100) + '%;background:var(--s2)" data-tip="<b>' + (p.shared + p.probable) + '</b> same window / probable"></i>' : '') +
+      '</div></div>' +
+      '<div class="legend"><span><i style="background:var(--s1)"></i>Confirmed</span><span><i style="background:var(--s2)"></i>Same window / probable</span></div>' +
       (topSlides ? '<div class="top3">Most edited: ' + topSlides + '</div>' : '') +
       '<div style="margin-top:10px"><button class="linkbtn" data-act="personHistory" data-person="' + esc(p.name) + '">See their changes →</button></div></div>';
   }).join('') + '</div>';
-  html += '<p class="status">Saves edited together count for everyone involved.</p>';
   $('#view').innerHTML = html;
+}
+
+/* ---------- Stats + charts ---------- */
+function niceMax(v) { if (v <= 5) return 5; const p = Math.pow(10, Math.floor(Math.log10(v))); const m = v / p; return (m <= 2 ? 2 : m <= 5 ? 5 : 10) * p; }
+
+function stackedBars(buckets) {
+  const W = 960, H = 250, L = 40, R = 10, T = 10, B = 30;
+  const pw = W - L - R, ph = H - T - B;
+  const max = niceMax(Math.max(1, ...buckets.map(b => b.total)));
+  const n = buckets.length, slot = pw / n, bw = Math.max(2, Math.min(26, slot * 0.7));
+  let s = '<svg class="viz" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Changes over time">';
+  for (let i = 0; i <= 5; i++) {
+    const v = max / 5 * i, y = T + ph - v / max * ph;
+    s += '<line class="gridl" x1="' + L + '" x2="' + (W - R) + '" y1="' + y + '" y2="' + y + '"/><text x="' + (L - 6) + '" y="' + (y + 4) + '" text-anchor="end">' + fmtN(v) + '</text>';
+  }
+  const every = Math.ceil(n / 12);
+  buckets.forEach((b, i) => {
+    const x = L + slot * i + (slot - bw) / 2;
+    let y = T + ph;
+    const segs = SERIES.filter(se => b.v[se.key]);
+    segs.forEach((se, k) => {
+      let hgt = b.v[se.key] / max * ph;
+      const gap = k > 0 ? 2 : 0;
+      y -= hgt; hgt -= gap;
+      if (hgt <= 0) return;
+      if (k === segs.length - 1) {
+        const r = Math.min(4, bw / 2, hgt);
+        s += '<path fill="' + se.color + '" d="M' + x + ',' + (y + hgt) + 'V' + (y + r) + 'Q' + x + ',' + y + ' ' + (x + r) + ',' + y + 'H' + (x + bw - r) + 'Q' + (x + bw) + ',' + y + ' ' + (x + bw) + ',' + (y + r) + 'V' + (y + hgt) + 'Z"/>';
+      } else s += '<rect fill="' + se.color + '" x="' + x + '" y="' + y + '" width="' + bw + '" height="' + hgt + '"/>';
+    });
+    if (i % every === 0) s += '<text x="' + (L + slot * i + slot / 2) + '" y="' + (H - 10) + '" text-anchor="middle">' + esc(b.label) + '</text>';
+    const tip = '<b>' + esc(b.full) + '</b> · ' + b.total + ' changes' + SERIES.filter(se => b.v[se.key]).map(se =>
+      '<div class=r><span><i style=background:' + se.color + '></i>' + se.name + '</span><b>' + b.v[se.key] + '</b></div>').join('');
+    s += '<rect class="hit" x="' + (L + slot * i) + '" y="' + T + '" width="' + slot + '" height="' + ph + '" data-tip="' + esc(tip) + '"/>';
+  });
+  s += '<line class="base" x1="' + L + '" x2="' + (W - R) + '" y1="' + (T + ph) + '" y2="' + (T + ph) + '"/></svg>';
+  return s;
+}
+
+function hbars(items, opts) {
+  const max = Math.max(1, ...items.map(it => it.segs.reduce((a, s) => a + s.n, 0)));
+  return '<div class="hb">' + items.map(it => {
+    const total = it.segs.reduce((a, s) => a + s.n, 0);
+    return '<span class="lab" title="' + esc(it.label) + '">' + esc(it.label) + '</span><span class="track">' +
+      it.segs.filter(s => s.n).map(s => '<i style="width:' + (s.n / max * 100) + '%;background:' + s.color + '" data-tip="<b>' + esc(it.label) + '</b><br>' + esc(s.name) + ': <b>' + s.n + '</b>"></i>').join('') +
+      '</span><span class="val">' + fmtN(total) + '</span>';
+  }).join('') + '</div>' + (opts && opts.legend ? legendHtml(opts.legend) : '');
+}
+function legendHtml(list) { return '<div class="legend" style="margin-top:10px">' + list.map(l => '<span><i style="background:' + l.color + '"></i>' + esc(l.name) + '</span>').join('') + '</div>'; }
+function table(head, rows) {
+  return '<table class="data"><thead><tr>' + head.map((h, i) => '<th' + (i ? ' class="n"' : '') + '>' + esc(h) + '</th>').join('') + '</tr></thead><tbody>' +
+    rows.map(r => '<tr>' + r.map((c, i) => '<td' + (i ? ' class="n"' : '') + '>' + esc(c) + '</td>').join('') + '</tr>').join('') + '</tbody></table>';
+}
+
+function renderStats() {
+  const d = state.data;
+  const rows = d.rows.filter(r => clsOf(r.change) !== 'note');
+  const slidesTouched = new Set(rows.map(r => r.slideId).filter(Boolean)).size;
+  let html = '<div class="kpis">' +
+    [[rows.length, 'changes'], [d.commits.filter(c => !c.version && c.changes.some(x => clsOf(x.change) !== 'note')).length, 'saves (check windows with edits)'],
+     [d.people.length, 'contributors'], [slidesTouched, 'slides edited'], [d.versions.filter(v => !v.gone).length, 'saved versions']]
+      .map(([v, k]) => '<div class="kpi"><div class="v">' + fmtN(v) + '</div><div class="k">' + k + '</div></div>').join('') + '</div>';
+  if (!rows.length) { $('#view').innerHTML = html + '<div class="box empty">No changes to chart yet.</div>'; return; }
+
+  // buckets: by day, or by week when the history is long
+  const t0 = Math.min(...rows.map(r => r.t)), t1 = Date.now();
+  const days = Math.max(1, Math.ceil((t1 - t0) / 864e5) + 1);
+  const weekly = days > 70;
+  const start = new Date(t0); start.setHours(0, 0, 0, 0); if (weekly) start.setDate(start.getDate() - start.getDay());
+  const step = weekly ? 7 : 1;
+  const minBuckets = 7;   // short histories: show a few empty days BEFORE, never days in the future
+  const span = Math.floor((t1 - start.getTime()) / (864e5 * step)) + 1;
+  if (span < minBuckets) start.setDate(start.getDate() - (minBuckets - span) * step);
+  const buckets = [];
+  for (const dt = new Date(start); dt.getTime() <= t1; dt.setDate(dt.getDate() + step)) {
+    buckets.push({ t: dt.getTime(), v: {}, total: 0,
+      label: dt.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
+      full: (weekly ? 'Week of ' : '') + dt.toLocaleDateString(undefined, { weekday: weekly ? undefined : 'short', month: 'short', day: 'numeric' }) });
+  }
+  rows.forEach(r => {
+    let i = Math.floor((r.t - start.getTime()) / (864e5 * step));
+    i = Math.max(0, Math.min(buckets.length - 1, i));
+    const k = clsOf(r.change); buckets[i].v[k] = (buckets[i].v[k] || 0) + 1; buckets[i].total++;
+  });
+
+  const byType = SERIES.map(se => ({ label: se.name, segs: [{ n: rows.filter(r => clsOf(r.change) === se.key).length, color: se.color, name: se.name }] }));
+  const people = perPerson().map(p => ({ label: p.name, segs: [
+    { n: p.confirmed, color: 'var(--s1)', name: 'Confirmed' }, { n: p.shared + p.probable, color: 'var(--s2)', name: 'Same window / probable' }] }));
+  const slideCount = new Map();
+  rows.forEach(r => { if (!r.slideId) return; const o = slideCount.get(r.slideId) || { n: 0, label: '' }; o.n++; o.label = slideName(r) + ' · ' + r.slideTitle; slideCount.set(r.slideId, o); });
+  const topSlides = [...slideCount.values()].sort((a, b) => b.n - a.n).slice(0, 10).map(o => ({ label: o.label, segs: [{ n: o.n, color: 'var(--s1)', name: 'Changes' }] }));
+  const hours = new Array(24).fill(0); rows.forEach(r => hours[new Date(r.t).getHours()]++);
+
+  const T = state.statsTable;
+  const card = (title, body, wide, extra) => '<div class="card chart' + (wide ? ' wide' : '') + '"><div class="cardh"><span class="t">' + title + '</span>' + (extra || '') + '</div><div class="cardb">' + body + '</div></div>';
+  html += '<div class="row" style="justify-content:flex-end;margin-bottom:10px"><button class="btn sm" data-act="statsTable">' + (T ? '📊 Show charts' : '▦ Show as tables') + '</button></div><div class="charts">';
+  html += card('Changes over time' + (weekly ? ' (per week)' : ' (per day)'),
+    T ? table([weekly ? 'Week of' : 'Day'].concat(SERIES.map(s => s.name), ['Total']), buckets.filter(b => b.total).map(b => [b.full].concat(SERIES.map(s => b.v[s.key] || 0), [b.total])))
+      : stackedBars(buckets) + legendHtml(SERIES), true);
+  html += card('Changes by type', T ? table(['Type', 'Changes'], byType.map(b => [b.label, b.segs[0].n])) : hbars(byType));
+  html += card('Changes by contributor', T ? table(['Person', 'Confirmed', 'Same window / probable'], people.map(p => [p.label, p.segs[0].n, p.segs[1].n]))
+    : hbars(people, { legend: [{ name: 'Confirmed', color: 'var(--s1)' }, { name: 'Same window / probable', color: 'var(--s2)' }] }));
+  html += card('Most-edited slides', T ? table(['Slide', 'Changes'], topSlides.map(s => [s.label, s.segs[0].n])) : hbars(topSlides));
+  html += card('Busiest hours of the day', T ? table(['Hour', 'Changes'], hours.map((n, h) => [hourLabel(h), n]).filter(r => r[1]))
+    : hourStrip(hours));
+  html += '</div>';
+  $('#view').innerHTML = html;
+}
+function hourLabel(h) { return (h % 12 || 12) + (h < 12 ? ' am' : ' pm'); }
+function hourStrip(hours) {
+  const max = Math.max(1, ...hours);
+  const lvl = n => n === 0 ? 'var(--g0)' : ['var(--q1)', 'var(--q2)', 'var(--q3)', 'var(--q4)'][Math.min(3, Math.floor(n / max * 3.999))];
+  return '<div style="display:grid;grid-template-columns:repeat(24,1fr);gap:3px">' + hours.map((n, h) =>
+    '<div style="height:34px;border-radius:3px;background:' + lvl(n) + '" data-tip="<b>' + hourLabel(h) + '</b>: ' + n + ' changes"></div>').join('') +
+    '</div><div style="display:grid;grid-template-columns:repeat(4,1fr);font-size:11px;color:var(--muted);margin-top:4px"><span>12 am</span><span>6 am</span><span>12 pm</span><span>6 pm</span></div>' +
+    '<div class="legend" style="margin-top:8px"><span>Fewer</span>' + ['var(--g0)', 'var(--q1)', 'var(--q2)', 'var(--q3)', 'var(--q4)'].map(c => '<span><i style="background:' + c + '"></i></span>').join('') + '<span>More</span></div>';
+}
+
+/* ---------- Export ---------- */
+async function doExport(fmt) {
+  $('#exportPop').classList.add('hidden');
+  let d = state.data;
+  try {
+    if (!state.demo && state.src) { setStatus('Downloading the full history…'); d = prepare(await getJSON(withParams(state.src, 'limit=all&_=' + Date.now()))); }
+    if (!d) return;
+    const name = (d.deck.title || 'slides').replace(/[^\w一-鿿 -]+/g, '').trim().replace(/\s+/g, '-') + '-history-' + new Date().toISOString().slice(0, 10);
+    const cols = ['time', 'commit', 'editors', 'attrib', 'slideNum', 'slideTitle', 'slideId', 'elementId', 'element', 'change', 'details', 'before', 'after', 'geo'];
+    const clean = d.all.map(r => { const o = {}; cols.forEach(c => { o[c] = r[c] == null ? '' : r[c]; }); return o; });
+    let blob;
+    if (fmt === 'json') {
+      blob = new Blob([JSON.stringify({ deck: d.deck, exported: new Date().toISOString(), count: clean.length, edits: clean }, null, 2)], { type: 'application/json' });
+    } else {
+      const q = v => { const s = String(v == null ? '' : v); return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+      const csv = '﻿' + [cols.join(',')].concat(clean.map(o => cols.map(c => q(o[c])).join(','))).join('\r\n');
+      blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+    }
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = name + '.' + fmt;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+    setStatus('Exported ' + fmtN(clean.length) + ' entries as ' + fmt.toUpperCase() + '.');
+  } catch (e) { setStatus('Export failed: ' + e.message, true); }
+}
+
+/* ---------- Modals (restore / save version) ---------- */
+function sessionGet(k) { try { return sessionStorage.getItem(k) || ''; } catch (e) { return ''; } }
+function sessionSet(k, v) { try { sessionStorage.setItem(k, v); } catch (e) {} }
+
+function openModal({ title, bodyHtml, confirmLabel, danger, onConfirm }) {
+  const needPw = !state.demo;
+  $('#modalRoot').innerHTML = '<div class="modal-bg"><div class="modal" role="dialog" aria-modal="true"><h3>' + esc(title) + '</h3>' + bodyHtml +
+    (needPw ? '<label>Password (ADMIN_PASSWORD in Code.gs)<input class="field" type="password" id="mPw" value="' + esc(sessionGet('sehPw')) + '"></label>' : '') +
+    '<label>Your name (shows in the history)<input class="field" id="mBy" maxlength="60" value="' + esc(sessionGet('sehBy')) + '"></label>' +
+    '<div class="msg" id="mMsg"></div><div class="acts"><button class="btn" data-act="closeModal">Cancel</button>' +
+    '<button class="btn ' + (danger ? 'danger' : 'primary') + '" id="mGo">' + esc(confirmLabel) + '</button></div></div></div>';
+  const go = $('#mGo');
+  go.onclick = async () => {
+    const pw = needPw ? $('#mPw').value : '', by = $('#mBy').value.trim();
+    sessionSet('sehBy', by);
+    go.disabled = true; state.busy = true;
+    $('#mMsg').className = 'msg'; $('#mMsg').textContent = 'Working… (restoring can take a minute for big decks)';
+    try {
+      const res = await onConfirm({ password: pw, by });
+      if (needPw) sessionSet('sehPw', pw);
+      $('#modalRoot').innerHTML = '';
+      await load(true);
+      setStatus('✓ ' + res);
+    } catch (e) {
+      $('#mMsg').className = 'msg err'; $('#mMsg').textContent = e.message; go.disabled = false;
+    } finally { state.busy = false; }
+  };
+  setTimeout(() => { const f = needPw && !$('#mPw').value ? $('#mPw') : go; f && f.focus(); }, 0);
+}
+
+function askRestore(id) {
+  const v = state.data.versions.find(x => x.id === id);
+  if (!v) return;
+  openModal({
+    title: 'Restore “' + v.name + '”?',
+    bodyHtml: '<p>Every slide in the deck will change back to how it was on <b>' + esc(fullTime(v.t)) + '</b>.</p>' +
+      '<p class="never">The current deck is saved first as a 🛟 safety copy, so you can undo this. Anyone with the deck open will see it change.</p>',
+    confirmLabel: '↩ Restore whole deck', danger: true,
+    onConfirm: async ({ password, by }) => { const r = await postJSON({ action: 'restore', id, password, by }); return 'Restored to “' + r.name + '”. A safety copy of the previous state was saved.'; },
+  });
+}
+function askSaveVersion() {
+  const name = ($('#verName') && $('#verName').value || '').trim();
+  if (!name) { $('#verName').focus(); return; }
+  openModal({
+    title: 'Save version “' + name + '”',
+    bodyHtml: '<p>Saves a full copy of the deck as it is right now.</p>',
+    confirmLabel: '📌 Save version',
+    onConfirm: async ({ password, by }) => { await postJSON({ action: 'saveVersion', name, password, by }); return 'Saved version “' + name + '”.'; },
+  });
 }
 
 function renderWelcome(err) {
@@ -622,21 +1059,23 @@ function renderWelcome(err) {
 
 /* ---------- events ---------- */
 document.addEventListener('click', e => {
+  if (!e.target.closest('#exportMenu')) $('#exportPop').classList.add('hidden');
   const b = e.target.closest('[data-act]');
-  if (!b) return;
+  if (!b || b.disabled) return;
   const act = b.dataset.act;
   if (act === 'toggle') {
+    if (e.target.closest('button[data-act="restore"]')) return;
     const id = b.dataset.commit;
     state.expanded.has(id) ? state.expanded.delete(id) : state.expanded.add(id);
-    renderHistory();
-  } else if (act === 'tab') { state.tab = b.dataset.tab; render(); window.scrollTo(0, 0); }
-  else if (act === 'refresh') load();
+    renderHistory(); fillImages();
+  } else if (act === 'tab') { state.tab = b.dataset.tab; state.highlightVersion = ''; render(); window.scrollTo(0, 0); }
+  else if (act === 'refresh') load(true);
   else if (act === 'settings') { state.data = null; renderWelcome(); }
   else if (act === 'saveSrc') {
     const v = ($('#srcInput').value || '').trim();
     if (!v) return;
-    state.src = v; state.demo = false; saveSource(v); state.firstLoad = true; load();
-  } else if (act === 'demo') { state.src = 'demo'; load(); }
+    state.src = v; state.demo = false; saveSource(v); state.firstLoad = true; load(true);
+  } else if (act === 'demo') { state.src = 'demo'; state.data = null; load(true); }
   else if (act === 'elHistory' || act === 'slideHistory' || act === 'personHistory') {
     e.stopPropagation();
     state.f = { editor: '', slide: '', type: '', q: '', element: '' };
@@ -647,6 +1086,16 @@ document.addEventListener('click', e => {
     state.expanded = new Set(state.data.commits.filter(c => c.changes.some(matches)).map(c => c.id));
     render(); window.scrollTo(0, 0);
   } else if (act === 'clearEl') { state.f.element = ''; render(); }
+  else if (act === 'compare') {
+    e.stopPropagation();
+    const k = b.dataset.key; state.compare.has(k) ? state.compare.delete(k) : state.compare.add(k);
+    renderHistory(); fillImages();
+  } else if (act === 'restore') { e.stopPropagation(); askRestore(b.dataset.id); }
+  else if (act === 'saveVersion') askSaveVersion();
+  else if (act === 'closeModal') { if (!state.busy) $('#modalRoot').innerHTML = ''; }
+  else if (act === 'exportMenu') $('#exportPop').classList.toggle('hidden');
+  else if (act === 'export') doExport(b.dataset.fmt);
+  else if (act === 'statsTable') { state.statsTable = !state.statsTable; renderStats(); }
 });
 $('#fEditor').addEventListener('change', e => { state.f.editor = e.target.value; render(); });
 $('#fSlide').addEventListener('change', e => { state.f.slide = e.target.value; render(); });
@@ -655,62 +1104,142 @@ let qTimer;
 $('#fQ').addEventListener('input', e => { clearTimeout(qTimer); qTimer = setTimeout(() => { state.f.q = e.target.value.trim(); render(); }, 200); });
 document.addEventListener('keydown', e => {
   if (e.key === 'Enter' && e.target && e.target.id === 'srcInput') document.querySelector('[data-act="saveSrc"]').click();
+  if (e.key === 'Enter' && e.target && e.target.id === 'verName') askSaveVersion();
+  if ((e.key === 'Enter' || e.key === ' ') && e.target && e.target.classList && e.target.classList.contains('chead')) { e.preventDefault(); e.target.click(); }
+  if (e.key === 'Escape' && !state.busy) $('#modalRoot').innerHTML = '';
 });
-setInterval(() => { if (!document.hidden && state.src && !state.demo) load(); }, REFRESH_MS);
+// tooltips for chart marks
+const tip = $('#tip');
+document.addEventListener('mousemove', e => {
+  const t = e.target.closest && e.target.closest('[data-tip]');
+  if (!t) { tip.style.display = 'none'; return; }
+  tip.innerHTML = t.getAttribute('data-tip');
+  tip.style.display = 'block';
+  const x = Math.min(window.innerWidth - tip.offsetWidth - 8, e.clientX + 14), y = Math.min(window.innerHeight - tip.offsetHeight - 8, e.clientY + 14);
+  tip.style.left = x + 'px'; tip.style.top = y + 'px';
+});
+setInterval(() => { if (!document.hidden && state.src && !state.demo && !state.busy && !$('#modalRoot').innerHTML) load(); }, REFRESH_MS);
 
 /* ---------- demo data ---------- */
+const DEMO_LAYOUT = {
+  s1: { title: 'Our Robot', els: { e1: [36, 140, 648, 70, 'title'], e2: [36, 220, 648, 40, 'sub'], e3: [540, 24, 150, 100, 'img'] } },
+  s2: { title: 'How It Works', els: { e4: [36, 18, 648, 56, 'title'], e5: [36, 100, 300, 220, 'body'], e6: [360, 100, 288, 214, 'img'] } },
+  s3: { title: 'Testing Results', els: { e7: [36, 18, 648, 56, 'title'], e8: [60, 100, 600, 200, 'table'] } },
+  s4: { title: 'Next Steps', els: { e9: [36, 18, 648, 56, 'title'], e10: [36, 100, 420, 220, 'body'], e11: [520, 110, 120, 120, 'star'], g1: [500, 280, 150, 60, 'arrow'] } },
+};
+const DEMO_IMAGES = {
+  i_s1_0: ['s1', { e1: 'Click to add title', e2: '' }],
+  i_s1_1: ['s1', { e1: 'Our Robot', e2: 'Team Presentation — Fall 2026' }],
+  i_s2_0: ['s2', { e4: 'How It Works', e5: 'The robot uses two motors to drive and one to lift.', move: { e4: [36, 29, 648, 56] }, hide: ['e6'] }],
+  i_s2_1: ['s2', { e4: 'How It Works', e5: 'The robot uses two motors to drive and one to lift.', size: { e6: [360, 100, 252, 187] } }],
+  i_s2_2: ['s2', { e4: 'How It Works', e5: 'The robot uses two motors to drive and a third motor to lift the arm.' }],
+  i_s3_0: ['s3', { e7: 'Testing Results', e8: 'Trial | Time | Score\n1 | 58s | 42\n2 | 55s | 47' }],
+  i_s3_1: ['s3', { e7: 'Testing Results', e8: 'Trial | Time | Score\n1 | 58s | 42\n2 | 55s | 47\n3 | 52s | 51', bold: 'e7' }],
+  i_s4_0: ['s4', { e9: 'Next Steps', e10: '1. Practice driving\n2. Add a sensor', e11: 'TODO' }],
+  i_s4_2: ['s4', { e9: 'Next Steps', e10: '1. Practice driving\n2. Add a distance sensor\n3. Tidy wires', hide: ['e11'] }],
+};
+function demoImage(id) {
+  const spec = DEMO_IMAGES[id]; if (!spec) return '';
+  const [sid, o] = spec, lay = DEMO_LAYOUT[sid];
+  let s = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 405"><rect width="720" height="405" fill="#ffffff"/><rect width="720" height="6" fill="#e37400"/>';
+  Object.entries(lay.els).forEach(([eid, g]) => {
+    if ((o.hide || []).includes(eid)) return;
+    let [x, y, w, h, kind] = g;
+    if (o.move && o.move[eid]) [x, y, w, h] = o.move[eid];
+    if (o.size && o.size[eid]) [x, y, w, h] = o.size[eid];
+    const txt = o[eid] != null ? o[eid] : '';
+    if (kind === 'img') s += '<rect x="' + x + '" y="' + y + '" width="' + w + '" height="' + h + '" rx="6" fill="#dbe7f5"/><path d="M' + (x + 14) + ' ' + (y + h - 14) + ' l' + (w * .3) + ' -' + (h * .45) + ' l' + (w * .2) + ' ' + (h * .25) + ' l' + (w * .15) + ' -' + (h * .15) + ' l' + (w * .25) + ' ' + (h * .35) + 'z" fill="#8aaed6"/><circle cx="' + (x + w - 30) + '" cy="' + (y + 28) + '" r="12" fill="#f2c14e"/>';
+    else if (kind === 'star') s += '<polygon points="' + [0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map(i => { const a = Math.PI / 5 * i - Math.PI / 2, r = i % 2 ? w * .22 : w * .5; return (x + w / 2 + r * Math.cos(a)) + ',' + (y + h / 2 + r * Math.sin(a)); }).join(' ') + '" fill="#f2c14e"/><text x="' + (x + w / 2) + '" y="' + (y + h / 2 + 5) + '" font-family="sans-serif" font-size="14" text-anchor="middle" fill="#5a4300">' + esc(txt) + '</text>';
+    else if (kind === 'arrow') s += '<path d="M' + x + ' ' + (y + 20) + 'h' + (w - 40) + 'v-20l40 30-40 30v-20h-' + (w - 40) + 'z" fill="#8fd19e"/>';
+    else if (kind === 'table') {
+      const lines = txt.split('\n'); const rh = Math.min(40, h / Math.max(1, lines.length));
+      lines.forEach((ln, i) => { s += '<rect x="' + x + '" y="' + (y + i * rh) + '" width="' + w + '" height="' + rh + '" fill="' + (i ? '#fff' : '#eef3f8') + '" stroke="#c9d3de"/>';
+        ln.split('|').forEach((c, j, arr) => { s += '<text x="' + (x + 12 + j * w / arr.length) + '" y="' + (y + i * rh + rh / 2 + 5) + '" font-family="sans-serif" font-size="14" fill="#333">' + esc(c.trim()) + '</text>'; }); });
+    } else {
+      const size = kind === 'title' ? 30 : kind === 'sub' ? 18 : 16;
+      const weight = kind === 'title' || o.bold === eid ? 700 : 400;
+      const fill = txt === 'Click to add title' ? '#aaa' : kind === 'title' && o.bold === eid ? '#e37400' : '#222';
+      const words = txt.split('\n').flatMap(l => { const out = []; let cur = ''; l.split(' ').forEach(wd => { if ((cur + ' ' + wd).length * size * .52 > w) { out.push(cur); cur = wd; } else cur = cur ? cur + ' ' + wd : wd; }); out.push(cur); return out; });
+      words.forEach((ln, i) => { s += '<text x="' + (x + 4) + '" y="' + (y + size + 4 + i * size * 1.35) + '" font-family="sans-serif" font-size="' + size + '" font-weight="' + weight + '" fill="' + fill + '">' + esc(ln) + '</text>'; });
+    }
+  });
+  return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(s + '</svg>');
+}
 function demoData() {
   const now = Date.now(), M = 60000, H = 60 * M, D = 24 * H;
   const rows = [];
-  const C = (t, commit, editors, list) => list.forEach(x => rows.push(Object.assign({
-    time: new Date(now - t).toISOString(), commit, editors, emails: '', slideNum: null, slideTitle: '', slideId: '',
-    elementId: '', element: '', details: '', before: '', after: '',
+  const geo = (b, a) => JSON.stringify({ b: b || null, a: a || null });
+  const L = (sid, eid) => DEMO_LAYOUT[sid].els[eid].slice(0, 4);
+  const C = (t, commit, editors, attrib, list) => list.forEach(x => rows.push(Object.assign({
+    time: new Date(now - t).toISOString(), commit, editors, attrib, emails: '', slideNum: null, slideTitle: '', slideId: '',
+    elementId: '', element: '', details: '', before: '', after: '', geo: '',
   }, x)));
-  C(4 * D, 'a1f09c2', 'Alex', [{ change: 'TRACKING_STARTED', details: 'Started tracking "Team Presentation" (4 slides)' }]);
-  C(4 * D - 20 * M, 'b77e1d0', 'Alex', [
-    { change: 'TEXT_EDITED', slideNum: 1, slideTitle: 'Our Robot', slideId: 's1', elementId: 'e1', element: 'Title "Our Robot"', details: 'Text changed', before: 'Click to add title', after: 'Our Robot' },
-    { change: 'TEXT_EDITED', slideNum: 1, slideTitle: 'Our Robot', slideId: 's1', elementId: 'e2', element: 'Subtitle "Team Presentation — Fall 2026"', details: 'Text changed', before: '', after: 'Team Presentation — Fall 2026' },
+  const IMG = (t, list) => C(t, 'img' + t, '', '', list.map(([sid, id]) => ({ change: 'IMAGE', slideId: sid, details: id })));
+  const VER = (t, commit, by, kind, name, id) => C(t, commit, by, 'confirmed', [{ change: 'VERSION_SAVED', details: name, elementId: id, before: kind }]);
+  C(4 * D, 'a1f09c2', 'Alex', 'confirmed', [{ change: 'TRACKING_STARTED', details: 'Started tracking "Team Presentation" (4 slides)' }]);
+  VER(4 * D - 1000, 'v0c1d2e', 'Automatic', 'auto', 'Start of tracking', 'demo-v0');
+  IMG(4 * D - 2000, [['s1', 'i_s1_0'], ['s2', 'i_s2_0'], ['s4', 'i_s4_0']]);
+  C(4 * D - 20 * M, 'b77e1d0', 'Alex', 'confirmed', [
+    { change: 'TEXT_EDITED', slideNum: 1, slideTitle: 'Our Robot', slideId: 's1', elementId: 'e1', element: 'Title "Our Robot"', details: 'Text changed', before: 'Click to add title', after: 'Our Robot', geo: geo(L('s1', 'e1'), L('s1', 'e1')) },
+    { change: 'TEXT_EDITED', slideNum: 1, slideTitle: 'Our Robot', slideId: 's1', elementId: 'e2', element: 'Subtitle "Team Presentation — Fall 2026"', details: 'Text changed', before: '', after: 'Team Presentation — Fall 2026', geo: geo(L('s1', 'e2'), L('s1', 'e2')) },
   ]);
-  C(3 * D, 'c3d5a91', 'Sam', [
+  IMG(4 * D - 21 * M, [['s1', 'i_s1_1']]);
+  C(3 * D, 'c3d5a91', 'Sam', 'confirmed', [
     { change: 'SLIDE_ADDED', slideNum: 3, slideTitle: 'Testing Results', slideId: 's3', details: 'New slide at position 3 (2 objects)', after: 'Testing Results\n---\nTrial | Time | Score\n1 | 58s | 42\n2 | 55s | 47' },
   ]);
-  C(3 * D - 6 * M, '0d9b2ee', 'Sam', [
-    { change: 'TEXT_EDITED', slideNum: 3, slideTitle: 'Testing Results', slideId: 's3', elementId: 'e8', element: 'Table (4×3) "Trial | Time | Score 1 | 58s | 42 2 | 55s…"', details: 'Text changed', before: 'Trial | Time | Score\n1 | 58s | 42\n2 | 55s | 47', after: 'Trial | Time | Score\n1 | 58s | 42\n2 | 55s | 47\n3 | 52s | 51' },
-    { change: 'FORMAT_CHANGED', slideNum: 3, slideTitle: 'Testing Results', slideId: 's3', elementId: 'e7', element: 'Title "Testing Results"', details: 'Text formatting changed (font, size, color, bullets…)' },
+  IMG(3 * D - 1000, [['s3', 'i_s3_0']]);
+  C(3 * D - 6 * M, '0d9b2ee', 'Sam', 'confirmed', [
+    { change: 'TEXT_EDITED', slideNum: 3, slideTitle: 'Testing Results', slideId: 's3', elementId: 'e8', element: 'Table (4×3) "Trial | Time | Score 1 | 58s | 42 2 | 55s…"', details: 'Text changed', before: 'Trial | Time | Score\n1 | 58s | 42\n2 | 55s | 47', after: 'Trial | Time | Score\n1 | 58s | 42\n2 | 55s | 47\n3 | 52s | 51', geo: geo(L('s3', 'e8'), L('s3', 'e8')) },
+    { change: 'FORMAT_CHANGED', slideNum: 3, slideTitle: 'Testing Results', slideId: 's3', elementId: 'e7', element: 'Title "Testing Results"', details: 'Text formatting changed (font, size, color, bullets…)', geo: geo(L('s3', 'e7'), L('s3', 'e7')) },
   ]);
-  C(2 * D, 'e41c7b3', 'Riley', [
-    { change: 'ELEMENT_ADDED', slideNum: 2, slideTitle: 'How It Works', slideId: 's2', elementId: 'e6', element: 'Image', details: 'Added Image at (5.10 in, 1.40 in), size 3.50 in × 2.60 in' },
-    { change: 'MOVED', slideNum: 2, slideTitle: 'How It Works', slideId: 's2', elementId: 'e4', element: 'Title "How It Works"', details: 'Moved from (0.50 in, 0.40 in) to (0.50 in, 0.25 in)' },
+  IMG(3 * D - 7 * M, [['s3', 'i_s3_1']]);
+  C(2 * D, 'e41c7b3', 'Riley', 'confirmed', [
+    { change: 'ELEMENT_ADDED', slideNum: 2, slideTitle: 'How It Works', slideId: 's2', elementId: 'e6', element: 'Image', details: 'Added Image at (5.00 in, 1.39 in), size 3.50 in × 2.60 in', geo: geo(null, [360, 100, 252, 187]) },
+    { change: 'MOVED', slideNum: 2, slideTitle: 'How It Works', slideId: 's2', elementId: 'e4', element: 'Title "How It Works"', details: 'Moved from (0.50 in, 0.40 in) to (0.50 in, 0.25 in)', geo: geo([36, 29, 648, 56], L('s2', 'e4')) },
   ]);
-  C(2 * D - 3 * M, 'f00a913', 'Riley', [{ change: 'CHECKPOINT', details: 'Finished the How It Works slide' }]);
-  C(5 * H, '7ab21c4', 'Alex, Sam', [
-    { change: 'TEXT_EDITED', slideNum: 2, slideTitle: 'How It Works', slideId: 's2', elementId: 'e5', element: 'Body text "The robot uses two motors to drive and a…"', details: 'Text changed', before: 'The robot uses two motors to drive and one to lift.', after: 'The robot uses two motors to drive and a third motor to lift the arm.' },
-    { change: 'RESIZED', slideNum: 2, slideTitle: 'How It Works', slideId: 's2', elementId: 'e6', element: 'Image', details: 'Resized from 3.50 in × 2.60 in to 4.00 in × 2.97 in' },
+  IMG(2 * D - 1000, [['s2', 'i_s2_1']]);
+  VER(2 * D - 3 * M, 'f00a913', 'Riley', 'named', 'Before Competition', 'demo-v1');
+  C(5 * H, '7ab21c4', 'Alex, Sam', 'shared', [
+    { change: 'TEXT_EDITED', slideNum: 2, slideTitle: 'How It Works', slideId: 's2', elementId: 'e5', element: 'Body text "The robot uses two motors to drive and a…"', details: 'Text changed', before: 'The robot uses two motors to drive and one to lift.', after: 'The robot uses two motors to drive and a third motor to lift the arm.', geo: geo(L('s2', 'e5'), L('s2', 'e5')) },
+    { change: 'RESIZED', slideNum: 2, slideTitle: 'How It Works', slideId: 's2', elementId: 'e6', element: 'Image', details: 'Resized from 3.50 in × 2.60 in to 4.00 in × 2.97 in', geo: geo([360, 100, 252, 187], L('s2', 'e6')) },
   ]);
-  C(3 * H, '91ce0f7', 'Sam', [
+  IMG(5 * H - 1000, [['s2', 'i_s2_2']]);
+  VER(5 * H - 2000, 'aa0be11', 'Automatic', 'auto', 'Auto-save', 'demo-v2');
+  C(3 * H, '91ce0f7', 'Sam', 'probable', [
     { change: 'SLIDE_DELETED', slideNum: 4, slideTitle: 'Old Ideas', slideId: 's5', details: 'Deleted slide 4 "Old Ideas"', before: 'Old Ideas\n---\nTank treads?\nClaw on top' },
     { change: 'SLIDE_MOVED', slideNum: 4, slideTitle: 'Next Steps', slideId: 's4', details: 'Moved slide from position 5 to 4', before: '5', after: '4' },
-    { change: 'NOTES_EDITED', slideNum: 2, slideTitle: 'How It Works', slideId: 's2', details: 'Speaker notes edited', before: 'Talk about motors', after: 'Talk about the motors and show the arm lifting' },
+    { change: 'NOTES_EDITED', slideNum: 2, slideTitle: 'How It Works', slideId: 's2', details: 'Speaker notes edited', before: 'Talk about motors', after: 'Talk about the motors\u000band show the arm lifting' },
   ]);
-  C(20 * M, '3e8d6aa', 'Riley', [
-    { change: 'TEXT_EDITED', slideNum: 4, slideTitle: 'Next Steps', slideId: 's4', elementId: 'e10', element: 'Body text "Practice driving Add a sensor Tidy wires"', details: 'Text and formatting changed', before: 'Practice driving\nAdd a sensor', after: 'Practice driving\nAdd a distance sensor\nTidy wires' },
-    { change: 'ELEMENT_DELETED', slideNum: 4, slideTitle: 'Next Steps', slideId: 's4', elementId: 'e11', element: 'Shape (star) "TODO"', details: 'Deleted Shape (star)', before: 'TODO' },
+  C(20 * M, '3e8d6aa', 'Riley', 'confirmed', [
+    { change: 'TEXT_EDITED', slideNum: 4, slideTitle: 'Next Steps', slideId: 's4', elementId: 'e10', element: 'Body text "1. Practice driving 2. Add a distance…"', details: 'Text and formatting changed', before: '1. Practice driving\n2. Add a sensor', after: '1. Practice driving\n2. Add a distance sensor\n3. Tidy wires', geo: geo(L('s4', 'e10'), L('s4', 'e10')) },
+    { change: 'ELEMENT_DELETED', slideNum: 4, slideTitle: 'Next Steps', slideId: 's4', elementId: 'e11', element: 'Shape (star) "TODO"', details: 'Deleted Shape (star)', before: 'TODO', geo: geo(L('s4', 'e11'), null) },
   ]);
+  IMG(20 * M - 1000, [['s4', 'i_s4_2']]);
+  VER(19 * M, 'b0d3f55', 'Riley', 'named', 'Final Robot Design', 'demo-v3');
   return {
-    deck: { title: 'Team Presentation (demo)', url: '' },
-    generated: new Date().toISOString(), lastChecked: new Date(now - 40000).toISOString(), rows,
-    current: [
-      { id: 's1', num: 1, title: 'Our Robot', elements: [{ id: 'e1', label: 'Title "Our Robot"' }, { id: 'e2', label: 'Subtitle "Team Presentation — Fall 2026"' }, { id: 'e3', label: 'Image' }] },
-      { id: 's2', num: 2, title: 'How It Works', elements: [{ id: 'e4', label: 'Title "How It Works"' }, { id: 'e5', label: 'Body text "The robot uses two motors to drive and a…"' }, { id: 'e6', label: 'Image' }] },
-      { id: 's3', num: 3, title: 'Testing Results', elements: [{ id: 'e7', label: 'Title "Testing Results"' }, { id: 'e8', label: 'Table (4×3) "Trial | Time | Score 1 | 58s | 42 2 | 55s…"' }] },
-      { id: 's4', num: 4, title: 'Next Steps', elements: [{ id: 'e9', label: 'Title "Next Steps"' }, { id: 'e10', label: 'Body text "Practice driving Add a sensor Tidy wires"' }, { id: 'g1', label: 'Group' }, { id: 'e12', label: 'Shape (arrow)', parent: 'g1' }] },
-    ],
+    deck: { title: 'Team Presentation (demo)', url: '', pageW: 720, pageH: 405 },
+    generated: new Date().toISOString(), lastChecked: new Date(now - 4000).toISOString(), webActions: true, rows,
+    current: Object.entries(DEMO_LAYOUT).map(([id, s], i) => ({ id, num: i + 1, title: s.title,
+      elements: Object.keys(s.els).filter(e => e !== 'e11').map(e => ({ id: e, label: { e1: 'Title "Our Robot"', e2: 'Subtitle "Team Presentation — Fall 2026"', e3: 'Image', e4: 'Title "How It Works"', e5: 'Body text "The robot uses two motors to drive and a…"', e6: 'Image', e7: 'Title "Testing Results"', e8: 'Table (4×3)', e9: 'Title "Next Steps"', e10: 'Body text "1. Practice driving 2. Add a distance…"', g1: 'Group' }[e] })) })),
   };
+}
+function demoAction(body) {
+  const d = state.data, now = new Date().toISOString(), commit = Math.random().toString(16).slice(2, 9);
+  const raw = { deck: d.deck, webActions: true, current: d.current, rows: d.all.map(r => { const o = Object.assign({}, r); delete o.idx; delete o.t; delete o.people; return o; }) };
+  const by = (body.by || 'Someone') + ' (via history page)';
+  if (body.action === 'saveVersion') raw.rows.push({ time: now, commit, editors: by, attrib: 'confirmed', change: 'VERSION_SAVED', details: body.name, elementId: 'demo-' + commit, before: 'named' });
+  if (body.action === 'restore') {
+    const v = d.versions.find(x => x.id === body.id);
+    raw.rows.push({ time: now, commit, editors: by, attrib: 'confirmed', change: 'VERSION_SAVED', details: 'Before restoring "' + v.name + '"', elementId: 'demo-s' + commit, before: 'pre-restore' });
+    raw.rows.push({ time: now, commit: commit + 'r', editors: by, attrib: 'confirmed', change: 'RESTORED', details: 'Restored the whole presentation to "' + v.name + '" (demo — nothing really changed)', elementId: v.id });
+  }
+  state.data = prepare(raw);
+  return { ok: true, name: body.action === 'restore' ? d.versions.find(x => x.id === body.id).name : body.name };
 }
 
 /* ---------- go ---------- */
 state.src = getSource();
-load();
+load(true);
 })();
 </script>
 </body>
