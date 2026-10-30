@@ -122,6 +122,8 @@ header{background:var(--panel);border-bottom:1px solid var(--border)}
 .sk.k-title .tx{font-size:3.6cqw;font-weight:700} .sk.k-sub .tx{font-size:2.6cqw} .sk.k-table .tx{font-size:1.8cqw;font-family:ui-monospace,monospace}
 .sk.k-img{background:repeating-linear-gradient(45deg,#eef2f6 0 6px,#e4eaf0 6px 12px);display:grid;place-items:center}
 .sk.k-img::after{content:"🖼";font-size:3cqw;opacity:.6}
+.sk.k-img.has-img{background-size:cover!important;background-position:center!important;background-repeat:no-repeat!important}
+.sk.k-img.has-img::after{content:none}
 .sk.k-line{border-width:0;border-top:2px solid #8c959f;border-radius:0}
 .sk.hot{border-width:2px;border-style:solid;color:#1f2328;overflow:visible;z-index:2}
 .sk.hot .tag{position:absolute;top:-1px;left:-1px;transform:translateY(-100%);font:600 10px/1.4 sans-serif;color:#fff;padding:0 4px;border-radius:3px 3px 0 0;white-space:nowrap}
@@ -539,7 +541,10 @@ function loadLive(slideId) {
   const hit = liveCache.get(slideId);
   if (hit && Date.now() - hit.at < 25 * 60000) return Promise.resolve(hit.url);   // Google's links last ~30 min
   const p = state.demo ? Promise.resolve(demoPreview(slideId))
-    : getJSON(withParams(state.src, 'action=preview&slide=' + encodeURIComponent(slideId))).then(j => j.url);
+    : getJSON(withParams(state.src, 'action=preview&slide=' + encodeURIComponent(slideId))).then(j => {
+        if (!j.url) throw new Error('your web app is running older code. Deploy → Manage deployments → pencil → New version → Deploy.');
+        return j.url;
+      });
   return p.then(url => { liveCache.set(slideId, { url, at: Date.now() }); return url; });
 }
 function fillLive(root) {
@@ -547,9 +552,37 @@ function fillLive(root) {
     if (box.dataset.done) return;
     box.dataset.done = '1';
     loadLive(box.dataset.live)
-      .then(url => { box.innerHTML = '<img alt="Live preview of the slide" src="' + esc(url) + '">'; })
+      .then(url => {
+        box.innerHTML = '<img alt="Live preview of the slide" referrerpolicy="no-referrer" src="' + esc(url) + '">';
+        box.querySelector('img').onerror = () => { liveCache.delete(box.dataset.live); box.innerHTML = '<div class="never">Google didn’t send the picture (the link may have expired). Click Refresh and try again.</div>'; };
+      })
       .catch(e => { box.innerHTML = '<div class="never">Couldn’t load the live preview: ' + esc(e.message) + '</div>'; });
   });
+  // real pictures inside the sketches (live from Google, not saved)
+  (root || document).querySelectorAll('[data-slideimgs]').forEach(cmp => {
+    if (cmp.dataset.done) return;
+    cmp.dataset.done = '1';
+    loadSlideImages(cmp.dataset.slideimgs).then(map => {
+      cmp.querySelectorAll('.sk.k-img[data-el]').forEach(el => {
+        const url = map[el.dataset.el];
+        if (!url) return;
+        const probe = new Image();
+        probe.referrerPolicy = 'no-referrer';
+        probe.onload = () => { el.style.backgroundImage = 'url("' + url.replace(/"/g, '%22') + '")'; el.classList.add('has-img'); };
+        probe.src = url;
+      });
+    }).catch(() => {});
+  });
+}
+const imgMapCache = new Map();
+function loadSlideImages(slideId) {
+  const hit = imgMapCache.get(slideId);
+  if (hit && Date.now() - hit.at < 25 * 60000) return hit.p;
+  const p = state.demo ? Promise.resolve(demoSlideImages(slideId))
+    : getJSON(withParams(state.src, 'action=slideImages&slide=' + encodeURIComponent(slideId))).then(j => j.images || {});
+  imgMapCache.set(slideId, { p, at: Date.now() });
+  p.catch(() => imgMapCache.delete(slideId));
+  return p;
 }
 
 /* ---------- rendering ---------- */
@@ -682,8 +715,8 @@ function kindClass(kind) {
   if (/^Line/.test(k)) return 'k-line';
   return '';
 }
-function skBox(b, W, H, cls, kind, text, tag) {
-  return '<div class="sk ' + kindClass(kind) + (cls ? ' hot ' + cls : '') + '" style="left:' + (b[0] / W * 100) + '%;top:' + (b[1] / H * 100) +
+function skBox(b, W, H, cls, kind, text, tag, id) {
+  return '<div class="sk ' + kindClass(kind) + (cls ? ' hot ' + cls : '') + '"' + (id ? ' data-el="' + esc(id) + '"' : '') + ' style="left:' + (b[0] / W * 100) + '%;top:' + (b[1] / H * 100) +
     '%;width:' + Math.max(.5, b[2] / W * 100) + '%;height:' + Math.max(.5, b[3] / H * 100) + '%">' +
     (tag ? '<b class="tag">' + esc(tag) + '</b>' : '') + (text ? '<span class="tx">' + esc(cleanText(text)) + '</span>' : '') + '</div>';
 }
@@ -706,15 +739,15 @@ function renderCompare(c, slideId, list) {
     objs.set(x.elementId, o);
   });
   const ctx = [...curEl.values()].filter(e => e.box && e.kind !== 'Group' && !objs.has(e.id))
-    .map(e => skBox(e.box, W, H, '', e.kind, e.text, '')).join('');
+    .map(e => skBox(e.box, W, H, '', e.kind, e.text, '', e.id)).join('');
   const side = which => {
     let h = ctx, drawn = 0;
     objs.forEach((o, id) => {
       const nowText = (curEl.get(id) || {}).text || '';
       const tag = uniq(o.labels).join(' + ');
       const main = o.cls.includes('add') ? 'add' : o.cls.includes('del') ? 'del' : o.cls.includes('mod') ? 'mod' : o.cls.includes('move') ? 'move' : 'fmt';
-      if (which === 'b' && o.b && main !== 'add') { h += skBox(o.b, W, H, main + (main === 'move' ? ' from' : ''), o.kind, o.tb != null ? o.tb : nowText, tag + (main === 'move' ? ' (was here)' : '')); drawn++; }
-      if (which === 'a' && o.a && main !== 'del') { h += skBox(o.a, W, H, main, o.kind, o.ta != null ? o.ta : nowText, tag); drawn++; }
+      if (which === 'b' && o.b && main !== 'add') { h += skBox(o.b, W, H, main + (main === 'move' ? ' from' : ''), o.kind, o.tb != null ? o.tb : nowText, tag + (main === 'move' ? ' (was here)' : ''), main === 'del' ? '' : id); drawn++; }
+      if (which === 'a' && o.a && main !== 'del') { h += skBox(o.a, W, H, main, o.kind, o.ta != null ? o.ta : nowText, tag, id); drawn++; }
     });
     return { h, drawn };
   };
@@ -722,7 +755,7 @@ function renderCompare(c, slideId, list) {
   const B = side('b'), A = side('a');
   const noGeo = objs.size && !B.drawn && !A.drawn;
   const delText = deleted ? (list.find(x => x.change === 'SLIDE_DELETED') || {}).before : '';
-  const html = '<div class="cmp"><div class="cmp-grid">' +
+  const html = '<div class="cmp"' + (cur && !deleted ? ' data-slideimgs="' + esc(slideId) + '"' : '') + '><div class="cmp-grid">' +
     '<div class="cmp-side"><h4><span>Before</span><span>sketch</span></h4>' +
       frame(B.h, added ? 'This slide didn’t exist yet.' : deleted ? '<div style="white-space:pre-wrap;text-align:left">' + esc(delText || '(empty slide)') + '</div>' : '') + '</div>' +
     '<div class="cmp-side"><h4><span>After</span><span>sketch</span></h4>' +
@@ -1151,6 +1184,10 @@ const DEMO_IMAGES = {
   i_s4_0: ['s4', { e9: 'Next Steps', e10: '1. Practice driving\n2. Add a sensor', e11: 'TODO' }],
   i_s4_2: ['s4', { e9: 'Next Steps', e10: '1. Practice driving\n2. Add a distance sensor\n3. Tidy wires', hide: ['e11'] }],
 };
+function demoSlideImages(slideId) {
+  const pic = (sky, hill) => 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 100"><rect width="160" height="100" fill="' + sky + '"/><circle cx="128" cy="24" r="10" fill="#f2c14e"/><path d="M0 100 L55 40 L85 70 L110 50 L160 100Z" fill="' + hill + '"/></svg>');
+  return { s1: { e3: pic('#cfe3f7', '#6a9a5b') }, s2: { e6: pic('#dbe7f5', '#8aaed6') } }[slideId] || {};
+}
 function demoPreview(slideId) { return demoImage({ s1: 'i_s1_1', s2: 'i_s2_2', s3: 'i_s3_1', s4: 'i_s4_2' }[slideId]); }
 function demoImage(id) {
   const spec = DEMO_IMAGES[id]; if (!spec) return '';
