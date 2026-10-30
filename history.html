@@ -229,7 +229,7 @@ footer{color:var(--muted);font-size:12px;text-align:center;padding:30px 0}
       <option value="mod">Text edits</option>
       <option value="fmt">Formatting</option>
       <option value="move">Moves &amp; sizes</option>
-      <option value="note">Versions &amp; notes</option>
+      <option value="note">Checkpoints &amp; notes</option>
     </select>
     <input id="fQ" type="search" placeholder="Search text, objects, slides…">
     <span id="fEl"></span>
@@ -255,7 +255,6 @@ const TYPES = {
   TRACKING_STARTED:  ['Tracking started', 'note'],
   TRACKER_UPDATED:   ['Tracker updated', 'note'],
   CHECKPOINT:        ['Checkpoint', 'note'],
-  VERSION_SAVED:     ['Version saved', 'note'],
   RESTORED:          ['Restored', 'note'],
   DECK_RENAMED:      ['Renamed', 'mod'],
   SLIDE_ADDED:       ['Slide added', 'add'],
@@ -275,7 +274,7 @@ const TYPES = {
   ROTATED:           ['Rotated', 'move'],
   GROUPING:          ['Grouping', 'move'],
 };
-const INTERNAL = new Set(['IMAGE', 'VERSION_REMOVED']);
+const INTERNAL = new Set(['IMAGE', 'VERSION_REMOVED', 'VERSION_SAVED']);   // old auto-backups are hidden
 /* chart series: fixed order, validated palette (blue, orange, aqua, yellow, magenta) */
 const SERIES = [
   { key: 'mod',  name: 'Text edits',   color: 'var(--s1)' },
@@ -290,7 +289,7 @@ const state = {
   src: '', demo: false, data: null, tab: 'history',
   f: { editor: '', slide: '', type: '', q: '', element: '' },
   expanded: new Set(), compare: new Set(), firstLoad: true, loading: false,
-  statsTable: false, highlightVersion: '', lastRender: 0, busy: false,
+  statsTable: false, lastRender: 0, busy: false,
 };
 const imgCache = new Map();
 
@@ -392,11 +391,9 @@ function prepare(j) {
     if (!images.has(r.slideId)) images.set(r.slideId, []);
     images.get(r.slideId).push({ idx: r.idx, t: r.t, id: r.details });
   });
-  // saved versions
-  const removed = new Set(all.filter(r => r.change === 'VERSION_REMOVED').map(r => r.elementId));
-  const versions = all.filter(r => r.change === 'VERSION_SAVED').map(r => ({
-    id: r.elementId, name: r.details, kind: r.before || 'auto', t: r.t, idx: r.idx, by: r.editors, commit: r.commit, gone: removed.has(r.elementId),
-  }));
+  // older versions saved "named versions" as deck copies; show them as checkpoints now
+  all.forEach(r => { if (r.change === 'VERSION_SAVED' && r.before === 'named') { r.change = 'CHECKPOINT'; r.before = ''; } });
+  const checkpoints = all.filter(r => r.change === 'CHECKPOINT');
   const rows = all.filter(r => !INTERNAL.has(r.change));
   const map = new Map();
   rows.forEach(r => {
@@ -405,20 +402,11 @@ function prepare(j) {
     map.get(k).changes.push(r);
   });
   const commits = [...map.values()].sort((a, b) => a.t - b.t || a.changes[0].idx - b.changes[0].idx);
-  // a version saved right after a commit (before any other edit) = "restore to this point"
-  let lastEdit = null;
-  commits.forEach(c => {
-    c.minIdx = Math.min(...c.changes.map(x => x.idx)); c.maxIdx = Math.max(...c.changes.map(x => x.idx));
-    const v = c.changes.find(x => x.change === 'VERSION_SAVED');
-    c.version = v ? versions.find(x => x.idx === v.idx) : null;
-    if (c.version) { if (lastEdit && !lastEdit.restorePoint && !c.version.gone) lastEdit.restorePoint = c.version; }
-    else if (!c.changes.every(x => clsOf(x.change) === 'note')) lastEdit = c;
-  });
   commits.reverse();
   const people = uniq(rows.filter(r => clsOf(r.change) !== 'note').flatMap(r => r.people))
     .filter(p => !/^(Automatic|Unknown)$/.test(p)).sort((a, b) => a.localeCompare(b));
   return { deck: j.deck || {}, generated: j.generated, lastChecked: j.lastChecked, webActions: !!j.webActions,
-           all, rows, commits, people, images, versions, current: j.current || [] };
+           all, rows, commits, people, images, checkpoints, current: j.current || [] };
 }
 
 function matches(r) {
@@ -435,12 +423,10 @@ function matches(r) {
 }
 
 function commitTitle(c) {
-  const v = c.changes.find(x => x.change === 'VERSION_SAVED');
-  if (v) return (v.before === 'named' ? '📌 Saved version “' : v.before === 'pre-restore' ? '🛟 Safety copy: “' : '⏱ Auto-saved version “') + v.details + '”';
   const rs = c.changes.find(x => x.change === 'RESTORED');
   if (rs) return '↩ ' + rs.details;
   const cp = c.changes.find(x => x.change === 'CHECKPOINT');
-  if (cp) return '★ ' + cp.details;
+  if (cp) return '📌 Checkpoint “' + cp.details + '”';
   const ts = c.changes.find(x => x.change === 'TRACKING_STARTED' || x.change === 'TRACKER_UPDATED');
   if (ts) return ts.details || 'Started tracking';
   const n = {};
@@ -514,7 +500,7 @@ async function load(force) {
   if (state.src === 'demo') {
     state.demo = true;
     if (!state.data) state.data = prepare(demoData());
-    setStatus('Showing demo data — nothing here is real, and restoring is simulated.');
+    setStatus('Showing demo data — nothing here is real.');
     render(); return;
   }
   if (!state.src) { renderWelcome(); return; }
@@ -565,18 +551,18 @@ function render() {
     : esc(d.deck.title || 'Slides Edit History');
   const edits = d.rows.filter(r => clsOf(r.change) !== 'note').length;
   $('#deckSub').textContent = d.rows.length
-    ? fmtN(edits) + ' changes · ' + d.versions.filter(v => !v.gone).length + ' saved versions · ' + d.people.length + ' contributor' + (d.people.length === 1 ? '' : 's') + (state.demo ? ' · demo' : '')
+    ? fmtN(edits) + ' changes · ' + d.checkpoints.length + ' checkpoint' + (d.checkpoints.length === 1 ? '' : 's') + ' · ' + d.people.length + ' contributor' + (d.people.length === 1 ? '' : 's') + (state.demo ? ' · demo' : '')
     : 'No changes logged yet';
   renderTabs();
   renderFilters();
   $('#filters').classList.toggle('hidden', state.tab !== 'history');
-  ({ history: renderHistory, versions: renderVersions, blame: renderBlame, people: renderPeople, stats: renderStats })[state.tab]();
+  ({ history: renderHistory, checkpoints: renderCheckpoints, blame: renderBlame, people: renderPeople, stats: renderStats })[state.tab]();
   fillImages();
 }
 
 function renderTabs() {
   const d = state.data;
-  const tabs = [['history', 'History', d.commits.length], ['versions', 'Versions', d.versions.filter(v => !v.gone).length],
+  const tabs = [['history', 'History', d.commits.length], ['checkpoints', 'Checkpoints', d.checkpoints.length],
                 ['blame', 'Blame', d.current.length || ''], ['people', 'Contributors', d.people.length], ['stats', 'Stats', '']];
   $('#tabs').innerHTML = tabs.map(([k, label, n]) =>
     '<button class="tab' + (state.tab === k ? ' on' : '') + '" data-act="tab" data-tab="' + k + '">' + label +
@@ -609,7 +595,7 @@ function renderHistory() {
   if (!d.rows.length) { $('#view').innerHTML = '<div class="box empty">No changes yet. Edit the deck, wait a few seconds, then refresh.</div>'; return; }
   const commits = d.commits.map(c => Object.assign({}, c, { shown: c.changes.filter(matches) })).filter(c => c.shown.length);
   if (!commits.length) { $('#view').innerHTML = '<div class="box empty">Nothing matches these filters.</div>'; return; }
-  if (state.firstLoad) { const first = commits.find(c => !c.version); if (first) state.expanded.add(first.id); state.firstLoad = false; }
+  if (state.firstLoad) { const first = commits.find(c => !c.changes.every(x => clsOf(x.change) === 'note')); if (first) state.expanded.add(first.id); state.firstLoad = false; }
 
   let html = '', curDay = '';
   commits.forEach(c => {
@@ -625,16 +611,9 @@ function renderHistory() {
   $('#view').innerHTML = html;
 }
 
-function restoreBtn(v, label) {
-  if (!v || v.gone) return '';
-  return '<button class="btn sm" data-act="restore" data-id="' + esc(v.id) + '"' +
-    (state.data.webActions || state.demo ? '' : ' disabled title="Set ADMIN_PASSWORD in Code.gs to restore from here, or use Edit History → Restore a version… in the deck"') +
-    '>↩ ' + esc(label || 'Restore') + '</button>';
-}
-
 function renderCommit(c) {
   const open = state.expanded.has(c.id);
-  const isVer = !!c.version;
+  const isVer = c.changes.every(x => clsOf(x.change) === 'note');
   const add = c.shown.filter(x => clsOf(x.change) === 'add').length;
   const del = c.shown.filter(x => clsOf(x.change) === 'del').length;
   const mod = c.shown.filter(x => clsOf(x.change) !== 'note').length - add - del;
@@ -646,7 +625,6 @@ function renderCommit(c) {
       '<span class="cmain"><div class="ctitle">' + esc(commitTitle(c)) + '</div>' +
       '<div class="cmeta">' + whoLine(people, c.attrib) + ' · <span title="' + esc(fullTime(c.t)) + '">' + esc(ago(c.t)) + '</span></div></span>' +
       '<span class="cright">' +
-        (isVer ? restoreBtn(c.version) : '') +
         (add ? '<span class="cnt add">+' + add + '</span>' : '') +
         (del ? '<span class="cnt del">−' + del + '</span>' : '') +
         (mod > 0 ? '<span class="cnt mod">~' + mod + '</span>' : '') +
@@ -654,7 +632,6 @@ function renderCommit(c) {
       '</span>' +
     '</div><div class="cbody">';
   if (open && !isVer) {
-    if (c.restorePoint) h += '<div class="note-line">A version was saved right after this: ' + restoreBtn(c.restorePoint, 'Restore the whole deck to this point') + '</div>';
     if (c.attrib === 'shared') h += '<div class="note-line">⚠ ' + esc(listNice(people, 'and')) + ' were all editing during the same check window, so these changes can’t be split between them.</div>';
     const groups = new Map();
     c.shown.forEach(x => { const k = x.slideId || '_deck'; if (!groups.has(k)) groups.set(k, []); groups.get(k).push(x); });
@@ -716,30 +693,28 @@ function renderCompare(c, slideId, list) {
     '<span>Pictures are taken at most once a minute per slide, so “after” can include a few later edits.</span></div></div>';
 }
 
-/* ---------- Versions ---------- */
-function renderVersions() {
+/* ---------- Checkpoints ---------- */
+function renderCheckpoints() {
   const d = state.data;
-  const list = d.versions.filter(v => !v.gone).slice().reverse();
+  const list = d.checkpoints.slice().reverse();
   const can = d.webActions || state.demo;
-  let html = '<div class="card" style="margin-top:16px"><div class="cardh"><span class="t">Save a named version</span></div><div class="cardb">' +
+  let html = '<div class="card" style="margin-top:16px"><div class="cardh"><span class="t">Add a named checkpoint</span></div><div class="cardb">' +
     (can
-      ? '<div class="savebar"><input class="field" id="verName" maxlength="100" placeholder="e.g. Before Competition, Final Robot Design, Notebook Complete"><button class="btn primary" data-act="saveVersion">📌 Save version</button></div>' +
-        '<p class="never" style="margin:8px 0 0">Saves a full copy of the deck right now. You can restore the whole presentation to it later.</p>'
-      : '<div class="callout">Saving and restoring from this page is turned off. In the deck use <b>Edit History → Save a named version…</b> and <b>Restore a version…</b>, ' +
-        'or set <code>ADMIN_PASSWORD</code> in Code.gs and deploy a new version to turn these buttons on.</div>') +
+      ? '<div class="savebar"><input class="field" id="cpName" maxlength="100" placeholder="e.g. Before Competition, Final Robot Design, Notebook Complete"><button class="btn primary" data-act="addCheckpoint">📌 Add checkpoint</button></div>' +
+        '<p class="never" style="margin:8px 0 0">Marks this moment in the history so it’s easy to find later. (No copy of the slideshow is made.)</p>'
+      : '<div class="callout">Adding checkpoints from this page is turned off. In the deck use <b>Edit History → Add a named checkpoint…</b>, ' +
+        'or set <code>ADMIN_PASSWORD</code> in Code.gs and deploy a new version to turn this on.</div>') +
     '</div></div>';
-  html += '<div class="card"><div class="cardh"><span class="t">Saved versions</span><span class="never">Named versions are kept forever; automatic ones are saved every ~30 min while people edit.</span></div>';
-  if (!list.length) html += '<div class="empty">No saved versions yet.</div>';
+  html += '<div class="card"><div class="cardh"><span class="t">Checkpoints</span></div>';
+  if (!list.length) html += '<div class="empty">No checkpoints yet.</div>';
   list.forEach(v => {
-    const icon = v.kind === 'named' ? '📌' : v.kind === 'pre-restore' ? '🛟' : '⏱';
-    const kind = v.kind === 'named' ? 'Named version' : v.kind === 'pre-restore' ? 'Safety copy made before a restore' : 'Automatic';
-    html += '<div class="vrow' + (state.highlightVersion === v.id ? ' hilite' : '') + '"><span class="vicon' + (v.kind === 'named' ? ' named' : '') + '">' + icon + '</span>' +
-      '<div class="vmain"><div class="vname">' + esc(v.name) + '</div><div class="never">' + kind + ' · ' + esc(fullTime(v.t)) + ' (' + esc(ago(v.t)) + ')' +
-      (v.by && v.by !== 'Automatic' ? ' · by ' + esc(v.by) : '') + '</div></div>' +
-      (state.demo ? '' : '<a class="btn sm" href="https://docs.google.com/presentation/d/' + encodeURIComponent(v.id) + '/edit" target="_blank" rel="noopener" title="Opens the saved copy (only the deck owner can open it)">Open copy</a>') +
-      restoreBtn(v) + '</div>';
+    const since = d.rows.filter(r => r.idx > v.idx && clsOf(r.change) !== 'note').length;
+    html += '<div class="vrow"><span class="vicon named">📌</span>' +
+      '<div class="vmain"><div class="vname">' + esc(v.details) + '</div><div class="never">' + esc(fullTime(v.t)) + ' (' + esc(ago(v.t)) + ')' +
+      (v.editors ? ' · by ' + esc(v.editors) : '') + ' · ' + fmtN(since) + ' change' + (since === 1 ? '' : 's') + ' since</div></div>' +
+      '<button class="btn sm" data-act="showCommit" data-commit="' + esc(v.commit) + '">Show in history</button></div>';
   });
-  html += '</div><p class="status">Restoring replaces every slide in the deck (same file and link). The current state is saved first as a 🛟 safety copy, so you can undo a restore. Google’s own File → Version history still works too.</p>';
+  html += '</div><p class="status">To undo changes, use the 🖼 before/after pictures in History, or Google’s own <b>File → Version history</b> in the deck.</p>';
   $('#view').innerHTML = html;
 }
 
@@ -901,8 +876,8 @@ function renderStats() {
   const rows = d.rows.filter(r => clsOf(r.change) !== 'note');
   const slidesTouched = new Set(rows.map(r => r.slideId).filter(Boolean)).size;
   let html = '<div class="kpis">' +
-    [[rows.length, 'changes'], [d.commits.filter(c => !c.version && c.changes.some(x => clsOf(x.change) !== 'note')).length, 'saves (check windows with edits)'],
-     [d.people.length, 'contributors'], [slidesTouched, 'slides edited'], [d.versions.filter(v => !v.gone).length, 'saved versions']]
+    [[rows.length, 'changes'], [d.commits.filter(c => c.changes.some(x => clsOf(x.change) !== 'note')).length, 'saves (check windows with edits)'],
+     [d.people.length, 'contributors'], [slidesTouched, 'slides edited'], [d.checkpoints.length, 'checkpoints']]
       .map(([v, k]) => '<div class="kpi"><div class="v">' + fmtN(v) + '</div><div class="k">' + k + '</div></div>').join('') + '</div>';
   if (!rows.length) { $('#view').innerHTML = html + '<div class="box empty">No changes to chart yet.</div>'; return; }
 
@@ -986,7 +961,7 @@ async function doExport(fmt) {
   } catch (e) { setStatus('Export failed: ' + e.message, true); }
 }
 
-/* ---------- Modals (restore / save version) ---------- */
+/* ---------- Modal (add checkpoint) ---------- */
 function sessionGet(k) { try { return sessionStorage.getItem(k) || ''; } catch (e) { return ''; } }
 function sessionSet(k, v) { try { sessionStorage.setItem(k, v); } catch (e) {} }
 
@@ -1002,7 +977,7 @@ function openModal({ title, bodyHtml, confirmLabel, danger, onConfirm }) {
     const pw = needPw ? $('#mPw').value : '', by = $('#mBy').value.trim();
     sessionSet('sehBy', by);
     go.disabled = true; state.busy = true;
-    $('#mMsg').className = 'msg'; $('#mMsg').textContent = 'Working… (restoring can take a minute for big decks)';
+    $('#mMsg').className = 'msg'; $('#mMsg').textContent = 'Working…';
     try {
       const res = await onConfirm({ password: pw, by });
       if (needPw) sessionSet('sehPw', pw);
@@ -1016,25 +991,14 @@ function openModal({ title, bodyHtml, confirmLabel, danger, onConfirm }) {
   setTimeout(() => { const f = needPw && !$('#mPw').value ? $('#mPw') : go; f && f.focus(); }, 0);
 }
 
-function askRestore(id) {
-  const v = state.data.versions.find(x => x.id === id);
-  if (!v) return;
+function askCheckpoint() {
+  const name = ($('#cpName') && $('#cpName').value || '').trim();
+  if (!name) { $('#cpName').focus(); return; }
   openModal({
-    title: 'Restore “' + v.name + '”?',
-    bodyHtml: '<p>Every slide in the deck will change back to how it was on <b>' + esc(fullTime(v.t)) + '</b>.</p>' +
-      '<p class="never">The current deck is saved first as a 🛟 safety copy, so you can undo this. Anyone with the deck open will see it change.</p>',
-    confirmLabel: '↩ Restore whole deck', danger: true,
-    onConfirm: async ({ password, by }) => { const r = await postJSON({ action: 'restore', id, password, by }); return 'Restored to “' + r.name + '”. A safety copy of the previous state was saved.'; },
-  });
-}
-function askSaveVersion() {
-  const name = ($('#verName') && $('#verName').value || '').trim();
-  if (!name) { $('#verName').focus(); return; }
-  openModal({
-    title: 'Save version “' + name + '”',
-    bodyHtml: '<p>Saves a full copy of the deck as it is right now.</p>',
-    confirmLabel: '📌 Save version',
-    onConfirm: async ({ password, by }) => { await postJSON({ action: 'saveVersion', name, password, by }); return 'Saved version “' + name + '”.'; },
+    title: 'Add checkpoint “' + name + '”',
+    bodyHtml: '<p>Marks this moment in the history.</p>',
+    confirmLabel: '📌 Add checkpoint',
+    onConfirm: async ({ password, by }) => { await postJSON({ action: 'checkpoint', name, password, by }); return 'Added checkpoint “' + name + '”.'; },
   });
 }
 
@@ -1064,11 +1028,10 @@ document.addEventListener('click', e => {
   if (!b || b.disabled) return;
   const act = b.dataset.act;
   if (act === 'toggle') {
-    if (e.target.closest('button[data-act="restore"]')) return;
     const id = b.dataset.commit;
     state.expanded.has(id) ? state.expanded.delete(id) : state.expanded.add(id);
     renderHistory(); fillImages();
-  } else if (act === 'tab') { state.tab = b.dataset.tab; state.highlightVersion = ''; render(); window.scrollTo(0, 0); }
+  } else if (act === 'tab') { state.tab = b.dataset.tab; render(); window.scrollTo(0, 0); }
   else if (act === 'refresh') load(true);
   else if (act === 'settings') { state.data = null; renderWelcome(); }
   else if (act === 'saveSrc') {
@@ -1090,8 +1053,13 @@ document.addEventListener('click', e => {
     e.stopPropagation();
     const k = b.dataset.key; state.compare.has(k) ? state.compare.delete(k) : state.compare.add(k);
     renderHistory(); fillImages();
-  } else if (act === 'restore') { e.stopPropagation(); askRestore(b.dataset.id); }
-  else if (act === 'saveVersion') askSaveVersion();
+  } else if (act === 'addCheckpoint') askCheckpoint();
+  else if (act === 'showCommit') {
+    state.f = { editor: '', slide: '', type: '', q: '', element: '' };
+    state.tab = 'history'; state.expanded.add(b.dataset.commit); render();
+    const el = document.querySelector('.chead[data-commit="' + b.dataset.commit + '"]');
+    if (el) el.scrollIntoView({ block: 'center' });
+  }
   else if (act === 'closeModal') { if (!state.busy) $('#modalRoot').innerHTML = ''; }
   else if (act === 'exportMenu') $('#exportPop').classList.toggle('hidden');
   else if (act === 'export') doExport(b.dataset.fmt);
@@ -1104,7 +1072,7 @@ let qTimer;
 $('#fQ').addEventListener('input', e => { clearTimeout(qTimer); qTimer = setTimeout(() => { state.f.q = e.target.value.trim(); render(); }, 200); });
 document.addEventListener('keydown', e => {
   if (e.key === 'Enter' && e.target && e.target.id === 'srcInput') document.querySelector('[data-act="saveSrc"]').click();
-  if (e.key === 'Enter' && e.target && e.target.id === 'verName') askSaveVersion();
+  if (e.key === 'Enter' && e.target && e.target.id === 'cpName') askCheckpoint();
   if ((e.key === 'Enter' || e.key === ' ') && e.target && e.target.classList && e.target.classList.contains('chead')) { e.preventDefault(); e.target.click(); }
   if (e.key === 'Escape' && !state.busy) $('#modalRoot').innerHTML = '';
 });
@@ -1175,9 +1143,8 @@ function demoData() {
     elementId: '', element: '', details: '', before: '', after: '', geo: '',
   }, x)));
   const IMG = (t, list) => C(t, 'img' + t, '', '', list.map(([sid, id]) => ({ change: 'IMAGE', slideId: sid, details: id })));
-  const VER = (t, commit, by, kind, name, id) => C(t, commit, by, 'confirmed', [{ change: 'VERSION_SAVED', details: name, elementId: id, before: kind }]);
+  const CP = (t, commit, by, name) => C(t, commit, by, 'confirmed', [{ change: 'CHECKPOINT', details: name }]);
   C(4 * D, 'a1f09c2', 'Alex', 'confirmed', [{ change: 'TRACKING_STARTED', details: 'Started tracking "Team Presentation" (4 slides)' }]);
-  VER(4 * D - 1000, 'v0c1d2e', 'Automatic', 'auto', 'Start of tracking', 'demo-v0');
   IMG(4 * D - 2000, [['s1', 'i_s1_0'], ['s2', 'i_s2_0'], ['s4', 'i_s4_0']]);
   C(4 * D - 20 * M, 'b77e1d0', 'Alex', 'confirmed', [
     { change: 'TEXT_EDITED', slideNum: 1, slideTitle: 'Our Robot', slideId: 's1', elementId: 'e1', element: 'Title "Our Robot"', details: 'Text changed', before: 'Click to add title', after: 'Our Robot', geo: geo(L('s1', 'e1'), L('s1', 'e1')) },
@@ -1198,13 +1165,12 @@ function demoData() {
     { change: 'MOVED', slideNum: 2, slideTitle: 'How It Works', slideId: 's2', elementId: 'e4', element: 'Title "How It Works"', details: 'Moved from (0.50 in, 0.40 in) to (0.50 in, 0.25 in)', geo: geo([36, 29, 648, 56], L('s2', 'e4')) },
   ]);
   IMG(2 * D - 1000, [['s2', 'i_s2_1']]);
-  VER(2 * D - 3 * M, 'f00a913', 'Riley', 'named', 'Before Competition', 'demo-v1');
+  CP(2 * D - 3 * M, 'f00a913', 'Riley', 'Before Competition');
   C(5 * H, '7ab21c4', 'Alex, Sam', 'shared', [
     { change: 'TEXT_EDITED', slideNum: 2, slideTitle: 'How It Works', slideId: 's2', elementId: 'e5', element: 'Body text "The robot uses two motors to drive and a…"', details: 'Text changed', before: 'The robot uses two motors to drive and one to lift.', after: 'The robot uses two motors to drive and a third motor to lift the arm.', geo: geo(L('s2', 'e5'), L('s2', 'e5')) },
     { change: 'RESIZED', slideNum: 2, slideTitle: 'How It Works', slideId: 's2', elementId: 'e6', element: 'Image', details: 'Resized from 3.50 in × 2.60 in to 4.00 in × 2.97 in', geo: geo([360, 100, 252, 187], L('s2', 'e6')) },
   ]);
   IMG(5 * H - 1000, [['s2', 'i_s2_2']]);
-  VER(5 * H - 2000, 'aa0be11', 'Automatic', 'auto', 'Auto-save', 'demo-v2');
   C(3 * H, '91ce0f7', 'Sam', 'probable', [
     { change: 'SLIDE_DELETED', slideNum: 4, slideTitle: 'Old Ideas', slideId: 's5', details: 'Deleted slide 4 "Old Ideas"', before: 'Old Ideas\n---\nTank treads?\nClaw on top' },
     { change: 'SLIDE_MOVED', slideNum: 4, slideTitle: 'Next Steps', slideId: 's4', details: 'Moved slide from position 5 to 4', before: '5', after: '4' },
@@ -1215,7 +1181,7 @@ function demoData() {
     { change: 'ELEMENT_DELETED', slideNum: 4, slideTitle: 'Next Steps', slideId: 's4', elementId: 'e11', element: 'Shape (star) "TODO"', details: 'Deleted Shape (star)', before: 'TODO', geo: geo(L('s4', 'e11'), null) },
   ]);
   IMG(20 * M - 1000, [['s4', 'i_s4_2']]);
-  VER(19 * M, 'b0d3f55', 'Riley', 'named', 'Final Robot Design', 'demo-v3');
+  CP(19 * M, 'b0d3f55', 'Riley', 'Final Robot Design');
   return {
     deck: { title: 'Team Presentation (demo)', url: '', pageW: 720, pageH: 405 },
     generated: new Date().toISOString(), lastChecked: new Date(now - 4000).toISOString(), webActions: true, rows,
@@ -1226,15 +1192,9 @@ function demoData() {
 function demoAction(body) {
   const d = state.data, now = new Date().toISOString(), commit = Math.random().toString(16).slice(2, 9);
   const raw = { deck: d.deck, webActions: true, current: d.current, rows: d.all.map(r => { const o = Object.assign({}, r); delete o.idx; delete o.t; delete o.people; return o; }) };
-  const by = (body.by || 'Someone') + ' (via history page)';
-  if (body.action === 'saveVersion') raw.rows.push({ time: now, commit, editors: by, attrib: 'confirmed', change: 'VERSION_SAVED', details: body.name, elementId: 'demo-' + commit, before: 'named' });
-  if (body.action === 'restore') {
-    const v = d.versions.find(x => x.id === body.id);
-    raw.rows.push({ time: now, commit, editors: by, attrib: 'confirmed', change: 'VERSION_SAVED', details: 'Before restoring "' + v.name + '"', elementId: 'demo-s' + commit, before: 'pre-restore' });
-    raw.rows.push({ time: now, commit: commit + 'r', editors: by, attrib: 'confirmed', change: 'RESTORED', details: 'Restored the whole presentation to "' + v.name + '" (demo — nothing really changed)', elementId: v.id });
-  }
+  if (body.action === 'checkpoint') raw.rows.push({ time: now, commit, editors: (body.by || 'Someone') + ' (via history page)', attrib: 'confirmed', change: 'CHECKPOINT', details: body.name });
   state.data = prepare(raw);
-  return { ok: true, name: body.action === 'restore' ? d.versions.find(x => x.id === body.id).name : body.name };
+  return { ok: true, name: body.name };
 }
 
 /* ---------- go ---------- */
