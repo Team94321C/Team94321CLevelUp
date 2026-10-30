@@ -116,6 +116,23 @@ header{background:var(--panel);border-bottom:1px solid var(--border)}
 .hl.mod,.hl.fmt{border-color:#d4a72c;background:rgba(212,167,44,.12)} .hl.mod span,.hl.fmt span{background:#9a6700}
 .hl.move{border-color:var(--move);background:rgba(56,139,253,.1)} .hl.move span{background:var(--move)}
 .hl.from{border-style:dashed;background:none}
+.sketch{container-type:inline-size;background:#fff;color:#1f2328}
+.sk{position:absolute;border:1px dashed #c9d1d9;border-radius:2px;overflow:hidden;color:#57606a}
+.sk .tx{display:block;white-space:pre-wrap;word-break:break-word;line-height:1.25;padding:.4cqw .6cqw;font-size:2.1cqw}
+.sk.k-title .tx{font-size:3.6cqw;font-weight:700} .sk.k-sub .tx{font-size:2.6cqw} .sk.k-table .tx{font-size:1.8cqw;font-family:ui-monospace,monospace}
+.sk.k-img{background:repeating-linear-gradient(45deg,#eef2f6 0 6px,#e4eaf0 6px 12px);display:grid;place-items:center}
+.sk.k-img::after{content:"🖼";font-size:3cqw;opacity:.6}
+.sk.k-line{border-width:0;border-top:2px solid #8c959f;border-radius:0}
+.sk.hot{border-width:2px;border-style:solid;color:#1f2328;overflow:visible;z-index:2}
+.sk.hot .tag{position:absolute;top:-1px;left:-1px;transform:translateY(-100%);font:600 10px/1.4 sans-serif;color:#fff;padding:0 4px;border-radius:3px 3px 0 0;white-space:nowrap}
+.sk.hot.add{border-color:#1a7f37;background:rgba(46,160,67,.10)} .sk.hot.add .tag{background:#1a7f37}
+.sk.hot.del{border-color:#cf222e;background:rgba(248,81,73,.10)} .sk.hot.del .tag{background:#cf222e}
+.sk.hot.mod,.sk.hot.fmt{border-color:#d4a72c;background:rgba(212,167,44,.12)} .sk.hot.mod .tag,.sk.hot.fmt .tag{background:#9a6700}
+.sk.hot.move{border-color:#0969da;background:rgba(56,139,253,.08)} .sk.hot.move .tag{background:#0969da}
+.sk.hot.from{border-style:dashed}
+.sk.hot .tx{overflow:hidden;max-height:100%}
+.live{margin-top:12px}
+.live img{display:block;width:100%;max-width:560px;border:1px solid var(--border);border-radius:6px}
 .cmp-legend{display:flex;gap:12px;flex-wrap:wrap;font-size:11px;color:var(--muted);margin-top:8px;align-items:center}
 .cmp-legend i{display:inline-block;width:10px;height:10px;border:2px solid;border-radius:2px;margin-right:4px;vertical-align:-1px}
 /* cards / blame / people */
@@ -288,10 +305,9 @@ const TEXT_DIFF_TYPES = new Set(['TEXT_EDITED', 'NOTES_EDITED', 'DECK_RENAMED'])
 const state = {
   src: '', demo: false, data: null, tab: 'history',
   f: { editor: '', slide: '', type: '', q: '', element: '' },
-  expanded: new Set(), compare: new Set(), firstLoad: true, loading: false,
+  expanded: new Set(), compare: new Set(), liveOpen: new Set(), firstLoad: true, loading: false,
   statsTable: false, lastRender: 0, busy: false,
 };
-const imgCache = new Map();
 
 /* ---------- helpers ---------- */
 const $ = s => document.querySelector(s);
@@ -385,12 +401,6 @@ function prepare(j) {
     before: cleanText(r.before), after: cleanText(r.after), details: cleanText(r.details),
     element: cleanText(r.element), slideTitle: cleanText(r.slideTitle),
   }));
-  // pictures per slide, in log order
-  const images = new Map();
-  all.filter(r => r.change === 'IMAGE').forEach(r => {
-    if (!images.has(r.slideId)) images.set(r.slideId, []);
-    images.get(r.slideId).push({ idx: r.idx, t: r.t, id: r.details });
-  });
   // older versions saved "named versions" as deck copies; show them as checkpoints now
   all.forEach(r => { if (r.change === 'VERSION_SAVED' && r.before === 'named') { r.change = 'CHECKPOINT'; r.before = ''; } });
   const checkpoints = all.filter(r => r.change === 'CHECKPOINT');
@@ -406,7 +416,7 @@ function prepare(j) {
   const people = uniq(rows.filter(r => clsOf(r.change) !== 'note').flatMap(r => r.people))
     .filter(p => !/^(Automatic|Unknown)$/.test(p)).sort((a, b) => a.localeCompare(b));
   return { deck: j.deck || {}, generated: j.generated, lastChecked: j.lastChecked, webActions: !!j.webActions,
-           all, rows, commits, people, images, checkpoints, current: j.current || [] };
+           all, rows, commits, people, checkpoints, current: j.current || [] };
 }
 
 function matches(r) {
@@ -523,21 +533,22 @@ async function load(force) {
 }
 function setStatus(t, err) { const el = $('#status'); el.textContent = t; el.className = 'status' + (err ? ' err' : ''); }
 
-/* ---------- slide pictures ---------- */
-function loadImage(id) {
-  if (imgCache.has(id)) return imgCache.get(id);
-  const p = state.demo ? Promise.resolve(demoImage(id))
-    : getJSON(withParams(state.src, 'action=image&id=' + encodeURIComponent(id))).then(j => j.data);
-  imgCache.set(id, p);
-  p.catch(() => imgCache.delete(id));
-  return p;
+/* ---------- live preview (straight from Google, never saved) ---------- */
+const liveCache = new Map();   // slideId -> {url, at}
+function loadLive(slideId) {
+  const hit = liveCache.get(slideId);
+  if (hit && Date.now() - hit.at < 25 * 60000) return Promise.resolve(hit.url);   // Google's links last ~30 min
+  const p = state.demo ? Promise.resolve(demoPreview(slideId))
+    : getJSON(withParams(state.src, 'action=preview&slide=' + encodeURIComponent(slideId))).then(j => j.url);
+  return p.then(url => { liveCache.set(slideId, { url, at: Date.now() }); return url; });
 }
-function fillImages(root) {
-  (root || document).querySelectorAll('img[data-img]').forEach(img => {
-    if (img.dataset.done) return;
-    img.dataset.done = '1';
-    loadImage(img.dataset.img).then(src => { img.src = src; img.nextElementSibling && img.nextElementSibling.classList.contains('ph') && img.nextElementSibling.remove(); })
-      .catch(e => { const ph = img.nextElementSibling; if (ph) ph.textContent = 'Couldn’t load picture: ' + e.message; });
+function fillLive(root) {
+  (root || document).querySelectorAll('[data-live]').forEach(box => {
+    if (box.dataset.done) return;
+    box.dataset.done = '1';
+    loadLive(box.dataset.live)
+      .then(url => { box.innerHTML = '<img alt="Live preview of the slide" src="' + esc(url) + '">'; })
+      .catch(e => { box.innerHTML = '<div class="never">Couldn’t load the live preview: ' + esc(e.message) + '</div>'; });
   });
 }
 
@@ -557,7 +568,7 @@ function render() {
   renderFilters();
   $('#filters').classList.toggle('hidden', state.tab !== 'history');
   ({ history: renderHistory, checkpoints: renderCheckpoints, blame: renderBlame, people: renderPeople, stats: renderStats })[state.tab]();
-  fillImages();
+  fillLive();
 }
 
 function renderTabs() {
@@ -641,7 +652,7 @@ function renderCommit(c) {
       const canCompare = sid !== '_deck' && list.some(x => clsOf(x.change) !== 'note');
       h += '<div class="slidegrp"><div class="sghead">' + esc(slideName(r)) +
         '<span class="t">' + (r.slideTitle ? '— ' + esc(r.slideTitle) : '') + '</span>' +
-        (canCompare ? '<button class="btn sm" data-act="compare" data-key="' + esc(key) + '">' + (state.compare.has(key) ? 'Hide pictures' : '🖼 Compare visually') + '</button>' : '') +
+        (canCompare ? '<button class="btn sm" data-act="compare" data-key="' + esc(key) + '">' + (state.compare.has(key) ? 'Hide preview' : '🖼 Preview') + '</button>' : '') +
         '</div>' + (state.compare.has(key) ? renderCompare(c, sid, list) : '') + list.map(renderChange).join('') + '</div>';
     });
   }
@@ -661,36 +672,70 @@ function renderChange(x) {
   return h + '</div>';
 }
 
-/* Before/after pictures with the changed objects outlined */
+/* Before/after SKETCHES drawn from the saved data (no pictures are stored) */
+function kindClass(kind) {
+  const k = String(kind || '');
+  if (/^Title/.test(k)) return 'k-title';
+  if (/^Subtitle/.test(k)) return 'k-sub';
+  if (/^(Image|Video|Sheets chart|Picture)/.test(k)) return 'k-img';
+  if (/^Table/.test(k)) return 'k-table';
+  if (/^Line/.test(k)) return 'k-line';
+  return '';
+}
+function skBox(b, W, H, cls, kind, text, tag) {
+  return '<div class="sk ' + kindClass(kind) + (cls ? ' hot ' + cls : '') + '" style="left:' + (b[0] / W * 100) + '%;top:' + (b[1] / H * 100) +
+    '%;width:' + Math.max(.5, b[2] / W * 100) + '%;height:' + Math.max(.5, b[3] / H * 100) + '%">' +
+    (tag ? '<b class="tag">' + esc(tag) + '</b>' : '') + (text ? '<span class="tx">' + esc(cleanText(text)) + '</span>' : '') + '</div>';
+}
 function renderCompare(c, slideId, list) {
   const d = state.data;
-  const imgs = d.images.get(slideId) || [];
-  const before = [...imgs].reverse().find(i => i.idx < c.minIdx);
-  const after = imgs.find(i => i.idx > c.maxIdx);
-  const added = list.some(x => x.change === 'SLIDE_ADDED'), deleted = list.some(x => x.change === 'SLIDE_DELETED');
   const W = d.deck.pageW || 720, H = d.deck.pageH || 405;
-  const boxes = { b: [], a: [] };
+  const cur = d.current.find(s => s.id === slideId);
+  const added = list.some(x => x.change === 'SLIDE_ADDED'), deleted = list.some(x => x.change === 'SLIDE_DELETED');
+  const curEl = new Map(((cur && cur.elements) || []).map(e => [e.id, e]));
+  // one entry per changed object, merging its changes in this save
+  const objs = new Map();
   list.forEach(x => {
-    const g = parseGeo(x.geo); if (!g) return;
-    const cls = clsOf(x.change), lab = typeOf(x.change)[0];
-    if (cls === 'move') { if (g.b) boxes.b.push([g.b, 'move from', lab + ' (was here)']); if (g.a) boxes.a.push([g.a, 'move', lab]); }
-    else if (cls === 'del') { if (g.b) boxes.b.push([g.b, 'del', lab]); }
-    else if (cls === 'add') { if (g.a) boxes.a.push([g.a, 'add', lab]); }
-    else { if (g.b) boxes.b.push([g.b, cls, lab]); if (g.a) boxes.a.push([g.a, cls, lab]); }
+    if (!x.elementId) return;
+    const g = parseGeo(x.geo) || {};
+    const o = objs.get(x.elementId) || { kind: (curEl.get(x.elementId) || {}).kind || String(x.element).replace(/\s*".*$/, ''), b: null, a: null, tb: null, ta: null, cls: [], labels: [] };
+    if (g.b) o.b = g.b; if (g.a) o.a = g.a;
+    if (TEXT_DIFF_TYPES.has(x.change) || x.change === 'ELEMENT_DELETED') o.tb = x.before;
+    if (TEXT_DIFF_TYPES.has(x.change) || x.change === 'ELEMENT_ADDED') o.ta = x.after;
+    o.cls.push(clsOf(x.change)); o.labels.push(typeOf(x.change)[0]);
+    objs.set(x.elementId, o);
   });
-  const dedupe = arr => { const seen = new Map(); arr.forEach(b => { const k = b[0].join(',') + b[1]; if (!seen.has(k)) seen.set(k, b); else seen.get(k)[2] += ' + ' + b[2]; }); return [...seen.values()]; };
-  const overlay = arr => dedupe(arr).map(([g, cls, lab]) =>
-    '<div class="hl ' + cls + '" title="' + esc(lab) + '" style="left:' + (g[0] / W * 100) + '%;top:' + (g[1] / H * 100) + '%;width:' + Math.max(1, g[2] / W * 100) + '%;height:' + Math.max(1, g[3] / H * 100) + '%"><span>' + esc(lab) + '</span></div>').join('');
-  const frame = (img, arr, emptyText) => '<div class="frame" style="aspect-ratio:' + W + '/' + H + '">' +
-    (img ? '<img data-img="' + esc(img.id) + '" alt=""><div class="ph">Loading picture…</div>' + overlay(arr) : '<div class="ph">' + emptyText + '</div>') + '</div>';
-  return '<div class="cmp"><div class="cmp-grid">' +
-    '<div class="cmp-side"><h4><span>Before</span><span>' + (before ? esc(ago(before.t)) : '') + '</span></h4>' +
-      frame(before, boxes.b, added ? 'This slide didn’t exist yet.' : 'No earlier picture of this slide (pictures start when tracking is updated).') + '</div>' +
-    '<div class="cmp-side"><h4><span>After</span><span>' + (after ? esc(ago(after.t)) : '') + '</span></h4>' +
-      frame(after, boxes.a, deleted ? 'This slide was deleted.' : 'The picture is taken within about a minute of the change — check back shortly.') + '</div>' +
+  const ctx = [...curEl.values()].filter(e => e.box && e.kind !== 'Group' && !objs.has(e.id))
+    .map(e => skBox(e.box, W, H, '', e.kind, e.text, '')).join('');
+  const side = which => {
+    let h = ctx, drawn = 0;
+    objs.forEach((o, id) => {
+      const nowText = (curEl.get(id) || {}).text || '';
+      const tag = uniq(o.labels).join(' + ');
+      const main = o.cls.includes('add') ? 'add' : o.cls.includes('del') ? 'del' : o.cls.includes('mod') ? 'mod' : o.cls.includes('move') ? 'move' : 'fmt';
+      if (which === 'b' && o.b && main !== 'add') { h += skBox(o.b, W, H, main + (main === 'move' ? ' from' : ''), o.kind, o.tb != null ? o.tb : nowText, tag + (main === 'move' ? ' (was here)' : '')); drawn++; }
+      if (which === 'a' && o.a && main !== 'del') { h += skBox(o.a, W, H, main, o.kind, o.ta != null ? o.ta : nowText, tag); drawn++; }
+    });
+    return { h, drawn };
+  };
+  const frame = (inner, empty) => '<div class="frame sketch" style="aspect-ratio:' + W + '/' + H + '">' + (empty ? '<div class="ph">' + empty + '</div>' : inner) + '</div>';
+  const B = side('b'), A = side('a');
+  const noGeo = objs.size && !B.drawn && !A.drawn;
+  const delText = deleted ? (list.find(x => x.change === 'SLIDE_DELETED') || {}).before : '';
+  const html = '<div class="cmp"><div class="cmp-grid">' +
+    '<div class="cmp-side"><h4><span>Before</span><span>sketch</span></h4>' +
+      frame(B.h, added ? 'This slide didn’t exist yet.' : deleted ? '<div style="white-space:pre-wrap;text-align:left">' + esc(delText || '(empty slide)') + '</div>' : '') + '</div>' +
+    '<div class="cmp-side"><h4><span>After</span><span>sketch</span></h4>' +
+      frame(A.h, deleted ? 'This slide was deleted.' : '') + '</div>' +
     '</div><div class="cmp-legend"><span><i style="border-color:var(--add)"></i>added</span><span><i style="border-color:var(--del)"></i>deleted</span>' +
     '<span><i style="border-color:#d4a72c"></i>edited / formatted</span><span><i style="border-color:var(--move)"></i>moved / resized (dashed = old spot)</span>' +
-    '<span>Pictures are taken at most once a minute per slide, so “after” can include a few later edits.</span></div></div>';
+    '<span>Drawn from the saved data. Objects that didn’t change here are shown as they are now.' + (noGeo ? ' (Older edits have no position data, so they can’t be drawn.)' : '') + '</span></div>' +
+    (cur && !deleted
+      ? (state.liveOpen.has(c.id + '|' + slideId)
+          ? '<div class="live"><h4 style="margin:0 0 6px;font-size:12px;color:var(--muted)">How the slide looks right now — live from Google, not saved</h4><div data-live="' + esc(slideId) + '"><div class="never">Loading…</div></div></div>'
+          : '<div class="live"><button class="btn sm" data-act="live" data-key="' + esc(c.id + '|' + slideId) + '">📷 Show the real slide as it looks now</button></div>')
+      : '') + '</div>';
+  return html;
 }
 
 /* ---------- Checkpoints ---------- */
@@ -754,7 +799,6 @@ function renderBlame() {
   let html = '<p class="status" style="padding-top:16px">Who last touched each slide and object, like <code>git blame</code>. Dashed avatars = not confirmed (several people were editing at once).</p>';
   slides.forEach(s => {
     const last = lastSlide.get(s.id), cr = created.get(s.id);
-    const imgs = d.images.get(s.id) || [];
     html += '<div class="card"><div class="cardh"><span class="t">Slide ' + s.num + ' — ' + esc(cleanText(s.title)) + '</span>' +
       '<span class="never">' + (cr ? 'created by <b>' + esc(listNice(cr.people)) + '</b> ' + esc(ago(cr.t)) + ' · ' : '') +
       (last ? 'last change ' + esc(ago(last.t)) : 'no changes yet') + '</span>' +
@@ -767,7 +811,6 @@ function renderBlame() {
     if (notes.has(s.id)) html += '<div class="brow"><span class="lbl">Speaker notes</span>' + who(notes.get(s.id)) + '</div>';
     if (!(s.elements || []).length && !notes.has(s.id)) html += '<div class="brow"><span class="lbl never">Empty slide</span><span></span></div>';
     html += '</div>';
-    void imgs;
   });
   const currentIds = new Set(slides.map(s => s.id));
   const deleted = rows.filter(r => r.change === 'SLIDE_DELETED' && !currentIds.has(r.slideId));
@@ -1030,7 +1073,7 @@ document.addEventListener('click', e => {
   if (act === 'toggle') {
     const id = b.dataset.commit;
     state.expanded.has(id) ? state.expanded.delete(id) : state.expanded.add(id);
-    renderHistory(); fillImages();
+    renderHistory(); fillLive();
   } else if (act === 'tab') { state.tab = b.dataset.tab; render(); window.scrollTo(0, 0); }
   else if (act === 'refresh') load(true);
   else if (act === 'settings') { state.data = null; renderWelcome(); }
@@ -1052,7 +1095,9 @@ document.addEventListener('click', e => {
   else if (act === 'compare') {
     e.stopPropagation();
     const k = b.dataset.key; state.compare.has(k) ? state.compare.delete(k) : state.compare.add(k);
-    renderHistory(); fillImages();
+    renderHistory(); fillLive();
+  } else if (act === 'live') {
+    e.stopPropagation(); state.liveOpen.add(b.dataset.key); renderHistory(); fillLive();
   } else if (act === 'addCheckpoint') askCheckpoint();
   else if (act === 'showCommit') {
     state.f = { editor: '', slide: '', type: '', q: '', element: '' };
@@ -1106,6 +1151,7 @@ const DEMO_IMAGES = {
   i_s4_0: ['s4', { e9: 'Next Steps', e10: '1. Practice driving\n2. Add a sensor', e11: 'TODO' }],
   i_s4_2: ['s4', { e9: 'Next Steps', e10: '1. Practice driving\n2. Add a distance sensor\n3. Tidy wires', hide: ['e11'] }],
 };
+function demoPreview(slideId) { return demoImage({ s1: 'i_s1_1', s2: 'i_s2_2', s3: 'i_s3_1', s4: 'i_s4_2' }[slideId]); }
 function demoImage(id) {
   const spec = DEMO_IMAGES[id]; if (!spec) return '';
   const [sid, o] = spec, lay = DEMO_LAYOUT[sid];
@@ -1142,35 +1188,28 @@ function demoData() {
     time: new Date(now - t).toISOString(), commit, editors, attrib, emails: '', slideNum: null, slideTitle: '', slideId: '',
     elementId: '', element: '', details: '', before: '', after: '', geo: '',
   }, x)));
-  const IMG = (t, list) => C(t, 'img' + t, '', '', list.map(([sid, id]) => ({ change: 'IMAGE', slideId: sid, details: id })));
   const CP = (t, commit, by, name) => C(t, commit, by, 'confirmed', [{ change: 'CHECKPOINT', details: name }]);
   C(4 * D, 'a1f09c2', 'Alex', 'confirmed', [{ change: 'TRACKING_STARTED', details: 'Started tracking "Team Presentation" (4 slides)' }]);
-  IMG(4 * D - 2000, [['s1', 'i_s1_0'], ['s2', 'i_s2_0'], ['s4', 'i_s4_0']]);
   C(4 * D - 20 * M, 'b77e1d0', 'Alex', 'confirmed', [
     { change: 'TEXT_EDITED', slideNum: 1, slideTitle: 'Our Robot', slideId: 's1', elementId: 'e1', element: 'Title "Our Robot"', details: 'Text changed', before: 'Click to add title', after: 'Our Robot', geo: geo(L('s1', 'e1'), L('s1', 'e1')) },
     { change: 'TEXT_EDITED', slideNum: 1, slideTitle: 'Our Robot', slideId: 's1', elementId: 'e2', element: 'Subtitle "Team Presentation — Fall 2026"', details: 'Text changed', before: '', after: 'Team Presentation — Fall 2026', geo: geo(L('s1', 'e2'), L('s1', 'e2')) },
   ]);
-  IMG(4 * D - 21 * M, [['s1', 'i_s1_1']]);
   C(3 * D, 'c3d5a91', 'Sam', 'confirmed', [
     { change: 'SLIDE_ADDED', slideNum: 3, slideTitle: 'Testing Results', slideId: 's3', details: 'New slide at position 3 (2 objects)', after: 'Testing Results\n---\nTrial | Time | Score\n1 | 58s | 42\n2 | 55s | 47' },
   ]);
-  IMG(3 * D - 1000, [['s3', 'i_s3_0']]);
   C(3 * D - 6 * M, '0d9b2ee', 'Sam', 'confirmed', [
     { change: 'TEXT_EDITED', slideNum: 3, slideTitle: 'Testing Results', slideId: 's3', elementId: 'e8', element: 'Table (4×3) "Trial | Time | Score 1 | 58s | 42 2 | 55s…"', details: 'Text changed', before: 'Trial | Time | Score\n1 | 58s | 42\n2 | 55s | 47', after: 'Trial | Time | Score\n1 | 58s | 42\n2 | 55s | 47\n3 | 52s | 51', geo: geo(L('s3', 'e8'), L('s3', 'e8')) },
     { change: 'FORMAT_CHANGED', slideNum: 3, slideTitle: 'Testing Results', slideId: 's3', elementId: 'e7', element: 'Title "Testing Results"', details: 'Text formatting changed (font, size, color, bullets…)', geo: geo(L('s3', 'e7'), L('s3', 'e7')) },
   ]);
-  IMG(3 * D - 7 * M, [['s3', 'i_s3_1']]);
   C(2 * D, 'e41c7b3', 'Riley', 'confirmed', [
     { change: 'ELEMENT_ADDED', slideNum: 2, slideTitle: 'How It Works', slideId: 's2', elementId: 'e6', element: 'Image', details: 'Added Image at (5.00 in, 1.39 in), size 3.50 in × 2.60 in', geo: geo(null, [360, 100, 252, 187]) },
     { change: 'MOVED', slideNum: 2, slideTitle: 'How It Works', slideId: 's2', elementId: 'e4', element: 'Title "How It Works"', details: 'Moved from (0.50 in, 0.40 in) to (0.50 in, 0.25 in)', geo: geo([36, 29, 648, 56], L('s2', 'e4')) },
   ]);
-  IMG(2 * D - 1000, [['s2', 'i_s2_1']]);
   CP(2 * D - 3 * M, 'f00a913', 'Riley', 'Before Competition');
   C(5 * H, '7ab21c4', 'Alex, Sam', 'shared', [
     { change: 'TEXT_EDITED', slideNum: 2, slideTitle: 'How It Works', slideId: 's2', elementId: 'e5', element: 'Body text "The robot uses two motors to drive and a…"', details: 'Text changed', before: 'The robot uses two motors to drive and one to lift.', after: 'The robot uses two motors to drive and a third motor to lift the arm.', geo: geo(L('s2', 'e5'), L('s2', 'e5')) },
     { change: 'RESIZED', slideNum: 2, slideTitle: 'How It Works', slideId: 's2', elementId: 'e6', element: 'Image', details: 'Resized from 3.50 in × 2.60 in to 4.00 in × 2.97 in', geo: geo([360, 100, 252, 187], L('s2', 'e6')) },
   ]);
-  IMG(5 * H - 1000, [['s2', 'i_s2_2']]);
   C(3 * H, '91ce0f7', 'Sam', 'probable', [
     { change: 'SLIDE_DELETED', slideNum: 4, slideTitle: 'Old Ideas', slideId: 's5', details: 'Deleted slide 4 "Old Ideas"', before: 'Old Ideas\n---\nTank treads?\nClaw on top' },
     { change: 'SLIDE_MOVED', slideNum: 4, slideTitle: 'Next Steps', slideId: 's4', details: 'Moved slide from position 5 to 4', before: '5', after: '4' },
@@ -1180,13 +1219,16 @@ function demoData() {
     { change: 'TEXT_EDITED', slideNum: 4, slideTitle: 'Next Steps', slideId: 's4', elementId: 'e10', element: 'Body text "1. Practice driving 2. Add a distance…"', details: 'Text and formatting changed', before: '1. Practice driving\n2. Add a sensor', after: '1. Practice driving\n2. Add a distance sensor\n3. Tidy wires', geo: geo(L('s4', 'e10'), L('s4', 'e10')) },
     { change: 'ELEMENT_DELETED', slideNum: 4, slideTitle: 'Next Steps', slideId: 's4', elementId: 'e11', element: 'Shape (star) "TODO"', details: 'Deleted Shape (star)', before: 'TODO', geo: geo(L('s4', 'e11'), null) },
   ]);
-  IMG(20 * M - 1000, [['s4', 'i_s4_2']]);
   CP(19 * M, 'b0d3f55', 'Riley', 'Final Robot Design');
   return {
     deck: { title: 'Team Presentation (demo)', url: '', pageW: 720, pageH: 405 },
     generated: new Date().toISOString(), lastChecked: new Date(now - 4000).toISOString(), webActions: true, rows,
     current: Object.entries(DEMO_LAYOUT).map(([id, s], i) => ({ id, num: i + 1, title: s.title,
-      elements: Object.keys(s.els).filter(e => e !== 'e11').map(e => ({ id: e, label: { e1: 'Title "Our Robot"', e2: 'Subtitle "Team Presentation — Fall 2026"', e3: 'Image', e4: 'Title "How It Works"', e5: 'Body text "The robot uses two motors to drive and a…"', e6: 'Image', e7: 'Title "Testing Results"', e8: 'Table (4×3)', e9: 'Title "Next Steps"', e10: 'Body text "1. Practice driving 2. Add a distance…"', g1: 'Group' }[e] })) })),
+      elements: Object.keys(s.els).filter(e => e !== 'e11').map(e => ({ id: e,
+        kind: { title: 'Title', sub: 'Subtitle', img: 'Image', body: 'Body text', table: 'Table (4×3)', star: 'Shape (star)', arrow: 'Shape (arrow)' }[s.els[e][4]],
+        box: s.els[e].slice(0, 4),
+        text: ({ e1: 'Our Robot', e2: 'Team Presentation — Fall 2026', e4: 'How It Works', e5: 'The robot uses two motors to drive and a third motor to lift the arm.', e7: 'Testing Results', e8: 'Trial | Time | Score\n1 | 58s | 42\n2 | 55s | 47\n3 | 52s | 51', e9: 'Next Steps', e10: '1. Practice driving\n2. Add a distance sensor\n3. Tidy wires' })[e] || '',
+        label: { e1: 'Title "Our Robot"', e2: 'Subtitle "Team Presentation — Fall 2026"', e3: 'Image', e4: 'Title "How It Works"', e5: 'Body text "The robot uses two motors to drive and a…"', e6: 'Image', e7: 'Title "Testing Results"', e8: 'Table (4×3)', e9: 'Title "Next Steps"', e10: 'Body text "1. Practice driving 2. Add a distance…"', g1: 'Group' }[e] })) })),
   };
 }
 function demoAction(body) {
