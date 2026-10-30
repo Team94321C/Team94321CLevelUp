@@ -1,0 +1,717 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Slides Edit History</title>
+<style>
+:root{
+  --bg:#f6f8fa; --panel:#fff; --border:#d0d7de; --text:#1f2328; --muted:#656d76; --accent:#0969da;
+  --add:#1a7f37; --add-bg:#dafbe1; --del:#cf222e; --del-bg:#ffebe9; --mod:#9a6700; --mod-bg:#fff8c5;
+  --fmt:#8250df; --fmt-bg:#fbefff; --move:#0969da; --move-bg:#ddf4ff; --note:#57606a; --note-bg:#eaeef2;
+  --chip:#eff2f5; --hover:#f3f4f6; --g0:#ebedf0; --g1:#9be9a8; --g2:#40c463; --g3:#30a14e; --g4:#216e39;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#0d1117; --panel:#161b22; --border:#30363d; --text:#e6edf3; --muted:#8d96a0; --accent:#4493f8;
+    --add:#3fb950; --add-bg:rgba(46,160,67,.2); --del:#f85149; --del-bg:rgba(248,81,73,.2);
+    --mod:#d29922; --mod-bg:rgba(187,128,9,.2); --fmt:#a371f7; --fmt-bg:rgba(163,113,247,.2);
+    --move:#4493f8; --move-bg:rgba(56,139,253,.2); --note:#8d96a0; --note-bg:rgba(110,118,129,.2);
+    --chip:#21262d; --hover:#1c2128; --g0:#161b22; --g1:#0e4429; --g2:#006d32; --g3:#26a641; --g4:#39d353;
+  }
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans",Helvetica,Arial,sans-serif}
+a{color:var(--accent);text-decoration:none} a:hover{text-decoration:underline}
+button,select,input{font:inherit;color:inherit}
+.wrap{max-width:1040px;margin:0 auto;padding:0 16px}
+header{background:var(--panel);border-bottom:1px solid var(--border)}
+.top{display:flex;align-items:center;gap:12px;padding:16px 0 8px;flex-wrap:wrap}
+.logo{width:32px;height:32px;border-radius:8px;background:linear-gradient(135deg,#f9ab00,#e37400);display:grid;place-items:center;color:#fff;font-weight:700;flex:none}
+.deck{flex:1;min-width:200px}
+.deck h1{font-size:20px;margin:0;font-weight:600;word-break:break-word}
+.deck .sub{color:var(--muted);font-size:12px}
+.btn{border:1px solid var(--border);background:var(--chip);border-radius:6px;padding:5px 12px;cursor:pointer;white-space:nowrap}
+.btn:hover{background:var(--hover)}
+.btn.primary{background:#1f883d;border-color:#1f883d;color:#fff}
+.tabs{display:flex;gap:4px;overflow-x:auto}
+.tab{border:0;background:none;padding:8px 14px;border-bottom:2px solid transparent;cursor:pointer;color:var(--muted);white-space:nowrap}
+.tab.on{color:var(--text);border-bottom-color:#fd8c73;font-weight:600}
+.tab .n{background:var(--chip);border-radius:20px;padding:0 7px;font-size:12px;margin-left:4px}
+.filters{display:flex;gap:8px;flex-wrap:wrap;padding:16px 0 8px;align-items:center}
+.filters select,.filters input{border:1px solid var(--border);background:var(--panel);border-radius:6px;padding:5px 8px}
+.filters input{flex:1;min-width:160px}
+.pill{display:inline-flex;align-items:center;gap:6px;background:var(--move-bg);color:var(--move);border-radius:20px;padding:2px 10px;font-size:12px}
+.pill button{border:0;background:none;cursor:pointer;color:inherit;padding:0;font-size:14px}
+.status{color:var(--muted);font-size:12px;padding:4px 0 12px}
+.status.err{color:var(--del)}
+.day{color:var(--muted);font-size:13px;margin:18px 0 8px;display:flex;align-items:center;gap:8px}
+.day::before{content:"";width:8px;height:8px;border-radius:50%;border:2px solid var(--muted)}
+.box{background:var(--panel);border:1px solid var(--border);border-radius:6px;overflow:hidden}
+.commit{border-top:1px solid var(--border)} .commit:first-child{border-top:0}
+.chead{display:flex;align-items:center;gap:12px;padding:10px 14px;width:100%;border:0;background:none;text-align:left;cursor:pointer}
+.chead:hover{background:var(--hover)}
+.avs{display:flex;flex:none} .avs .av{margin-left:-8px;border:2px solid var(--panel)} .avs .av:first-child{margin-left:0}
+.av{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;color:#fff;font-size:11px;font-weight:700;flex:none}
+.av.big{width:44px;height:44px;font-size:16px}
+.cmain{flex:1;min-width:0}
+.ctitle{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cmeta{color:var(--muted);font-size:12px}
+.cright{display:flex;align-items:center;gap:6px;flex:none}
+.sha{font:12px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:var(--muted);border:1px solid var(--border);border-radius:6px;padding:1px 6px}
+.cnt{font:600 12px ui-monospace,monospace}
+.cnt.add{color:var(--add)} .cnt.del{color:var(--del)} .cnt.mod{color:var(--mod)}
+.chev{color:var(--muted);transition:transform .15s} .open .chev{transform:rotate(90deg)}
+.cbody{display:none;border-top:1px solid var(--border);background:var(--bg);padding:10px 14px 14px}
+.open .cbody{display:block}
+.slidegrp{background:var(--panel);border:1px solid var(--border);border-radius:6px;margin-top:10px}
+.slidegrp:first-child{margin-top:0}
+.sghead{padding:6px 12px;border-bottom:1px solid var(--border);font:600 13px/1.6 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:var(--chip);border-radius:6px 6px 0 0}
+.sghead span{font-family:inherit;font-weight:400;color:var(--muted)}
+.ch{padding:8px 12px;border-top:1px solid var(--border)} .ch:first-of-type{border-top:0}
+.chline{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}
+.badge{font-size:11px;font-weight:600;border-radius:20px;padding:1px 8px;white-space:nowrap}
+.b-add{background:var(--add-bg);color:var(--add)} .b-del{background:var(--del-bg);color:var(--del)}
+.b-mod{background:var(--mod-bg);color:var(--mod)} .b-fmt{background:var(--fmt-bg);color:var(--fmt)}
+.b-move{background:var(--move-bg);color:var(--move)} .b-note{background:var(--note-bg);color:var(--note)}
+.el{font-weight:600} .det{color:var(--muted)}
+.diff{margin-top:6px;border:1px solid var(--border);border-radius:6px;padding:8px 10px;white-space:pre-wrap;word-break:break-word;font:13px/1.55 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:var(--panel)}
+.diff del{background:var(--del-bg);color:var(--del);text-decoration:line-through;border-radius:3px}
+.diff ins{background:var(--add-bg);color:var(--add);text-decoration:none;border-radius:3px}
+.diff.all-add{background:var(--add-bg)} .diff.all-del{background:var(--del-bg);text-decoration:line-through;color:var(--del)}
+.linkbtn{border:0;background:none;color:var(--accent);cursor:pointer;padding:0;font-size:12px}
+.empty{padding:40px 20px;text-align:center;color:var(--muted)}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:6px;margin-bottom:14px}
+.cardh{padding:10px 14px;border-bottom:1px solid var(--border);display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.cardh .t{font-weight:600;flex:1;min-width:150px}
+.brow{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 12px;padding:7px 14px;border-top:1px solid var(--border);align-items:center}
+.brow:first-of-type{border-top:0}
+.brow .who{display:flex;align-items:center;gap:6px;color:var(--muted);font-size:12px;justify-content:flex-end;flex-wrap:wrap}
+.brow .who .av{width:20px;height:20px;font-size:9px}
+.brow .lbl{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.brow.child .lbl{padding-left:18px}
+.brow.child .lbl::before{content:"└ ";color:var(--muted)}
+.never{color:var(--muted);font-size:12px}
+.people{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px}
+.person{padding:14px}
+.phead{display:flex;gap:12px;align-items:center;margin-bottom:10px}
+.pname{font-weight:600;font-size:16px}
+.stats{display:flex;gap:16px;color:var(--muted);font-size:12px;flex-wrap:wrap}
+.stats b{color:var(--text);font-size:14px}
+.bar{display:flex;height:8px;border-radius:4px;overflow:hidden;background:var(--chip);margin:10px 0 6px}
+.bar i{display:block;height:100%}
+.legend{display:flex;gap:10px;flex-wrap:wrap;font-size:11px;color:var(--muted)}
+.legend span::before{content:"";display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:4px;background:var(--c)}
+.top3{font-size:12px;color:var(--muted);margin-top:8px}
+.grid{display:grid;grid-template-rows:repeat(7,11px);grid-auto-flow:column;grid-auto-columns:11px;gap:3px;overflow-x:auto;padding-bottom:4px}
+.grid i{border-radius:2px;background:var(--g0);outline:1px solid rgba(27,31,36,.06);outline-offset:-1px}
+.grid i.l1{background:var(--g1)} .grid i.l2{background:var(--g2)} .grid i.l3{background:var(--g3)} .grid i.l4{background:var(--g4)}
+.welcome{max-width:640px;margin:40px auto;padding:24px}
+.welcome h2{margin-top:0}
+.welcome input{width:100%;border:1px solid var(--border);background:var(--bg);border-radius:6px;padding:8px 10px;margin:8px 0 12px}
+.welcome ol{padding-left:20px;color:var(--muted)}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+.hidden{display:none!important}
+footer{color:var(--muted);font-size:12px;text-align:center;padding:30px 0}
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <div class="top">
+      <div class="logo">⎇</div>
+      <div class="deck"><h1 id="deckTitle">Slides Edit History</h1><div class="sub" id="deckSub"></div></div>
+      <button class="btn" data-act="refresh" title="Reload now">⟳ Refresh</button>
+      <button class="btn" data-act="settings" title="Change data source">⚙</button>
+    </div>
+    <nav class="tabs" id="tabs"></nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <div id="filters" class="filters hidden">
+    <select id="fEditor"><option value="">All editors</option></select>
+    <select id="fSlide"><option value="">All slides</option></select>
+    <select id="fType">
+      <option value="">All changes</option>
+      <option value="add">Additions</option>
+      <option value="del">Deletions</option>
+      <option value="mod">Text edits</option>
+      <option value="fmt">Formatting</option>
+      <option value="move">Moves &amp; sizes</option>
+      <option value="note">Checkpoints</option>
+    </select>
+    <input id="fQ" type="search" placeholder="Search text, objects, slides…">
+    <span id="fEl"></span>
+  </div>
+  <div id="status" class="status"></div>
+  <div id="view"></div>
+</main>
+<footer>While this page is open the deck is checked every 10 seconds; otherwise about once a minute. People editing in the same window are listed together.</footer>
+
+<script>
+(function () {
+'use strict';
+
+/* Paste your Apps Script web app URL (ends in /exec) here to skip the setup screen. */
+const DEFAULT_SOURCE = '';
+
+const LS_KEY = 'slidesEditHistory.src';
+const REFRESH_MS = 10000;   // while this page is open, check the deck every 10 seconds
+
+const TYPES = {
+  TRACKING_STARTED:  ['Tracking started', 'note'],
+  CHECKPOINT:        ['Checkpoint', 'note'],
+  DECK_RENAMED:      ['Renamed', 'mod'],
+  SLIDE_ADDED:       ['Slide added', 'add'],
+  SLIDE_DELETED:     ['Slide deleted', 'del'],
+  SLIDE_MOVED:       ['Slide moved', 'move'],
+  LAYOUT_CHANGED:    ['Layout', 'fmt'],
+  BACKGROUND_CHANGED:['Background', 'fmt'],
+  NOTES_EDITED:      ['Speaker notes', 'mod'],
+  ELEMENT_ADDED:     ['Added', 'add'],
+  ELEMENT_DELETED:   ['Deleted', 'del'],
+  TEXT_EDITED:       ['Text edited', 'mod'],
+  FORMAT_CHANGED:    ['Formatting', 'fmt'],
+  IMAGE_CHANGED:     ['Image', 'fmt'],
+  ELEMENT_CHANGED:   ['Changed', 'fmt'],
+  MOVED:             ['Moved', 'move'],
+  RESIZED:           ['Resized', 'move'],
+  ROTATED:           ['Rotated', 'move'],
+  GROUPING:          ['Grouping', 'move'],
+};
+const CLS_COLORS = { add: 'var(--add)', del: 'var(--del)', mod: 'var(--mod)', fmt: 'var(--fmt)', move: 'var(--move)', note: 'var(--note)' };
+const CLS_NAMES = { add: 'Added', del: 'Deleted', mod: 'Text', fmt: 'Formatting', move: 'Moves/sizes', note: 'Checkpoints' };
+const TEXT_DIFF_TYPES = new Set(['TEXT_EDITED', 'NOTES_EDITED', 'DECK_RENAMED']);
+
+const state = {
+  src: '', demo: false, data: null, tab: 'history',
+  f: { editor: '', slide: '', type: '', q: '', element: '' },
+  expanded: new Set(), firstLoad: true, loading: false,
+};
+
+/* ---------- helpers ---------- */
+const $ = s => document.querySelector(s);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const typeOf = c => TYPES[c] || [c ? c.toLowerCase().replace(/_/g, ' ') : 'Change', 'fmt'];
+const clsOf = c => typeOf(c)[1];
+const splitPeople = s => String(s || '').split(/\s*,\s*/).filter(Boolean);
+const uniq = a => [...new Set(a)];
+
+function hashColor(name) {
+  let h = 0;
+  for (const ch of String(name)) h = (h * 31 + ch.codePointAt(0)) >>> 0;
+  return 'hsl(' + (h % 360) + ' 55% 45%)';
+}
+function initials(name) {
+  const n = String(name || '?').replace(/@.*/, '').trim();
+  const parts = n.split(/[\s._-]+/).filter(Boolean);
+  if (!parts.length) return '?';
+  return (parts.length === 1 ? [...parts[0]].slice(0, 2).join('') : [...parts[0]][0] + [...parts[parts.length - 1]][0]).toUpperCase();
+}
+function avatar(name, cls) {
+  return '<span class="av ' + (cls || '') + '" style="background:' + hashColor(name) + '" title="' + esc(name) + '">' + esc(initials(name)) + '</span>';
+}
+function ago(t) {
+  if (!t) return '';
+  const s = Math.round((Date.now() - t) / 1000);
+  if (s < 45) return 'just now';
+  const m = Math.round(s / 60); if (m < 60) return m + ' min ago';
+  const h = Math.round(m / 60); if (h < 24) return h + ' hour' + (h > 1 ? 's' : '') + ' ago';
+  const d = Math.round(h / 24); if (d < 30) return d + ' day' + (d > 1 ? 's' : '') + ' ago';
+  return new Date(t).toLocaleDateString();
+}
+const fullTime = t => t ? new Date(t).toLocaleString() : '';
+const dayKey = t => { const d = new Date(t); return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate(); };
+const slideName = r => r.slideNum ? 'Slide ' + r.slideNum : (r.slideId ? 'Slide' : 'Presentation');
+function listNice(arr) { return arr.length <= 1 ? arr.join('') : arr.slice(0, -1).join(', ') + ' & ' + arr[arr.length - 1]; }
+
+/* ---------- word diff ---------- */
+function tokenize(s) { return String(s).match(/\s+|[A-Za-z0-9_À-ɏ'’]+|[^\s]/gu) || []; }
+function diffWords(a, b) {
+  const A = tokenize(a), B = tokenize(b);
+  let s = 0; while (s < A.length && s < B.length && A[s] === B[s]) s++;
+  let e = 0; while (e < A.length - s && e < B.length - s && A[A.length - 1 - e] === B[B.length - 1 - e]) e++;
+  const a2 = A.slice(s, A.length - e), b2 = B.slice(s, B.length - e);
+  const ops = [];
+  if (s) ops.push(['=', A.slice(0, s).join('')]);
+  const n = a2.length, m = b2.length;
+  if (n * m > 2500000) {
+    if (n) ops.push(['-', a2.join('')]);
+    if (m) ops.push(['+', b2.join('')]);
+  } else {
+    const W = m + 1, L = new Uint32Array((n + 1) * W);
+    for (let i = n - 1; i >= 0; i--) for (let j = m - 1; j >= 0; j--)
+      L[i * W + j] = a2[i] === b2[j] ? L[(i + 1) * W + j + 1] + 1 : Math.max(L[(i + 1) * W + j], L[i * W + j + 1]);
+    let i = 0, j = 0;
+    while (i < n && j < m) {
+      if (a2[i] === b2[j]) { ops.push(['=', a2[i]]); i++; j++; }
+      else if (L[(i + 1) * W + j] >= L[i * W + j + 1]) { ops.push(['-', a2[i]]); i++; }
+      else { ops.push(['+', b2[j]]); j++; }
+    }
+    while (i < n) ops.push(['-', a2[i++]]);
+    while (j < m) ops.push(['+', b2[j++]]);
+  }
+  if (e) ops.push(['=', A.slice(A.length - e).join('')]);
+  // merge neighbours; fold lone spaces between two edits into the edits
+  const merged = [];
+  ops.forEach(o => {
+    const last = merged[merged.length - 1];
+    if (last && last[0] === o[0]) last[1] += o[1]; else merged.push(o.slice());
+  });
+  return merged;
+}
+function renderDiff(before, after) {
+  return '<div class="diff">' + diffWords(before, after).map(([op, t]) =>
+    op === '=' ? esc(t) : op === '-' ? '<del>' + esc(t) + '</del>' : '<ins>' + esc(t) + '</ins>').join('') + '</div>';
+}
+
+/* ---------- data ---------- */
+function prepare(j) {
+  const rows = (j.rows || []).map((r, i) => Object.assign({}, r, {
+    idx: i, t: Date.parse(r.time) || 0, people: splitPeople(r.editors),
+  }));
+  rows.sort((a, b) => a.t - b.t || a.idx - b.idx);
+  const map = new Map();
+  rows.forEach(r => {
+    const k = r.commit || ('row' + r.idx);
+    if (!map.has(k)) map.set(k, { id: k, t: r.t, people: r.people, changes: [] });
+    map.get(k).changes.push(r);
+  });
+  const commits = [...map.values()].sort((a, b) => b.t - a.t);
+  const people = uniq(rows.flatMap(r => r.people)).sort((a, b) => a.localeCompare(b));
+  return { deck: j.deck || {}, generated: j.generated, lastChecked: j.lastChecked, rows, commits, people, current: j.current || [] };
+}
+
+function matches(r) {
+  const f = state.f;
+  if (f.editor && !r.people.includes(f.editor)) return false;
+  if (f.slide && r.slideId !== f.slide) return false;
+  if (f.element && r.elementId !== f.element) return false;
+  if (f.type && clsOf(r.change) !== f.type) return false;
+  if (f.q) {
+    const hay = [r.slideTitle, r.element, r.details, r.before, r.after, r.editors, typeOf(r.change)[0]].join(' ').toLowerCase();
+    if (!hay.includes(f.q.toLowerCase())) return false;
+  }
+  return true;
+}
+
+function commitTitle(c) {
+  const cp = c.changes.find(x => x.change === 'CHECKPOINT');
+  if (cp) return '★ ' + cp.details;
+  const ts = c.changes.find(x => x.change === 'TRACKING_STARTED');
+  if (ts) return ts.details || 'Started tracking';
+  const n = {};
+  c.changes.forEach(x => { n[x.change] = (n[x.change] || 0) + 1; });
+  const ph = [];
+  const P = (k, one, many) => { if (n[k]) ph.push(n[k] === 1 ? one : many.replace('#', n[k])); };
+  P('SLIDE_ADDED', 'added a slide', 'added # slides');
+  P('SLIDE_DELETED', 'deleted a slide', 'deleted # slides');
+  P('TEXT_EDITED', 'edited text', 'edited text in # places');
+  P('ELEMENT_ADDED', 'added an object', 'added # objects');
+  P('ELEMENT_DELETED', 'deleted an object', 'deleted # objects');
+  P('SLIDE_MOVED', 'reordered slides', 'reordered slides');
+  P('NOTES_EDITED', 'edited speaker notes', 'edited notes on # slides');
+  P('MOVED', 'moved an object', 'moved # objects');
+  P('RESIZED', 'resized an object', 'resized # objects');
+  P('ROTATED', 'rotated an object', 'rotated # objects');
+  P('FORMAT_CHANGED', 'changed formatting', 'changed formatting in # places');
+  P('IMAGE_CHANGED', 'adjusted an image', 'adjusted # images');
+  P('LAYOUT_CHANGED', 'changed a layout', 'changed # layouts');
+  P('BACKGROUND_CHANGED', 'changed a background', 'changed # backgrounds');
+  P('DECK_RENAMED', 'renamed the deck', 'renamed the deck');
+  P('GROUPING', 'grouped objects', 'grouped objects');
+  if (!ph.length) ph.push(c.changes.length + ' change' + (c.changes.length > 1 ? 's' : ''));
+  let t = ph.slice(0, 3).join(', ') + (ph.length > 3 ? ' and more' : '');
+  const nums = uniq(c.changes.map(x => x.slideNum).filter(Boolean)).sort((a, b) => a - b);
+  if (nums.length) t += ' on slide' + (nums.length > 1 ? 's ' : ' ') + (nums.length > 5 ? nums.slice(0, 5).join(', ') + '…' : listNice(nums.map(String)));
+  return t.charAt(0).toUpperCase() + t.slice(1);
+}
+
+/* ---------- loading ---------- */
+function getSource() {
+  const qs = new URLSearchParams(location.search);
+  if (qs.has('demo')) return 'demo';
+  if (qs.get('src')) return qs.get('src');
+  try { const s = localStorage.getItem(LS_KEY); if (s) return s; } catch (e) {}
+  return DEFAULT_SOURCE;
+}
+function saveSource(s) { try { localStorage.setItem(LS_KEY, s); } catch (e) {} }
+
+async function load() {
+  if (state.loading) return;
+  if (state.src === 'demo') { state.demo = true; state.data = prepare(demoData()); setStatus('Showing demo data.'); render(); return; }
+  if (!state.src) { renderWelcome(); return; }
+  state.loading = true;
+  if (!state.data) setStatus('Loading history…');
+  try {
+    const url = state.src + (state.src.includes('?') ? '&' : '?') + 'check=1&_=' + Date.now();
+    const res = await fetch(url, { redirect: 'follow' });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const text = await res.text();
+    let j;
+    try { j = JSON.parse(text); }
+    catch (e) { throw new Error('The URL didn’t return history data. Check the web app is deployed with “Who has access: Anyone”.'); }
+    if (j.error) throw new Error(j.error);
+    const prev = state.data;
+    state.data = prepare(j);
+    if (j.checkError) setStatus('Live check failed: ' + j.checkError, true);
+    else setStatus('Live · checked ' + new Date().toLocaleTimeString() + ' · updates every ' + (REFRESH_MS / 1000) + 's');
+    // only redraw when something actually changed, so the page doesn't flicker
+    if (!prev || prev.rows.length !== state.data.rows.length || Date.now() - (state.lastRender || 0) > 60000) {
+      render();
+      state.lastRender = Date.now();
+    }
+  } catch (err) {
+    const msg = (err && err.message) || String(err);
+    setStatus('Couldn’t load: ' + (msg === 'Failed to fetch' ? 'network error, or the web app isn’t shared with “Anyone”.' : msg), true);
+    if (!state.data) renderWelcome(msg);
+  } finally {
+    state.loading = false;
+  }
+}
+function setStatus(t, err) { const el = $('#status'); el.textContent = t; el.className = 'status' + (err ? ' err' : ''); }
+
+/* ---------- rendering ---------- */
+function render() {
+  const d = state.data;
+  if (!d) return;
+  $('#deckTitle').innerHTML = d.deck.url
+    ? '<a href="' + esc(d.deck.url) + '" target="_blank" rel="noopener">' + esc(d.deck.title || 'Untitled deck') + '</a>'
+    : esc(d.deck.title || 'Slides Edit History');
+  const realCommits = d.commits.filter(c => !c.changes.every(x => x.change === 'TRACKING_STARTED'));
+  $('#deckSub').textContent = d.rows.length
+    ? realCommits.length + ' saves · ' + d.rows.length + ' changes · ' + d.people.length + ' contributor' + (d.people.length === 1 ? '' : 's') + (state.demo ? ' · demo' : '')
+    : 'No changes logged yet';
+  renderTabs();
+  renderFilters();
+  $('#filters').classList.toggle('hidden', state.tab !== 'history');
+  if (state.tab === 'history') renderHistory();
+  else if (state.tab === 'blame') renderBlame();
+  else renderPeople();
+}
+
+function renderTabs() {
+  const d = state.data;
+  const tabs = [['history', 'History', d.commits.length], ['blame', 'Blame', d.current.length || ''], ['people', 'Contributors', d.people.length]];
+  $('#tabs').innerHTML = tabs.map(([k, label, n]) =>
+    '<button class="tab' + (state.tab === k ? ' on' : '') + '" data-act="tab" data-tab="' + k + '">' + label +
+    (n !== '' ? '<span class="n">' + n + '</span>' : '') + '</button>').join('');
+}
+
+function renderFilters() {
+  const d = state.data, f = state.f;
+  $('#fEditor').innerHTML = '<option value="">All editors</option>' +
+    d.people.map(p => '<option' + (p === f.editor ? ' selected' : '') + '>' + esc(p) + '</option>').join('');
+  const slides = [];
+  const seen = new Set();
+  d.current.forEach(s => { seen.add(s.id); slides.push([s.id, 'Slide ' + s.num + ' · ' + s.title]); });
+  const lastBySlide = new Map();
+  d.rows.forEach(r => { if (r.slideId) lastBySlide.set(r.slideId, r); });
+  lastBySlide.forEach((r, id) => {
+    if (!seen.has(id)) slides.push([id, (r.change === 'SLIDE_DELETED' ? '(deleted) ' : '') + slideName(r) + ' · ' + r.slideTitle]);
+  });
+  $('#fSlide').innerHTML = '<option value="">All slides</option>' +
+    slides.map(([id, label]) => '<option value="' + esc(id) + '"' + (id === f.slide ? ' selected' : '') + '>' + esc(label.length > 60 ? label.slice(0, 59) + '…' : label) + '</option>').join('');
+  $('#fType').value = f.type;
+  if ($('#fQ').value !== f.q) $('#fQ').value = f.q;
+  if (f.element) {
+    const r = [...d.rows].reverse().find(x => x.elementId === f.element);
+    $('#fEl').innerHTML = '<span class="pill">Object: ' + esc(r ? r.element : f.element) + ' <button data-act="clearEl" title="Clear">×</button></span>';
+  } else $('#fEl').innerHTML = '';
+}
+
+function renderHistory() {
+  const d = state.data;
+  if (!d.rows.length) {
+    $('#view').innerHTML = '<div class="box empty">No changes yet. Edit the deck, wait about a minute, then refresh.</div>';
+    return;
+  }
+  const commits = d.commits.map(c => Object.assign({}, c, { shown: c.changes.filter(matches) })).filter(c => c.shown.length);
+  if (!commits.length) { $('#view').innerHTML = '<div class="box empty">Nothing matches these filters.</div>'; return; }
+  if (state.firstLoad) { state.expanded.add(commits[0].id); state.firstLoad = false; }
+
+  let html = '', curDay = '';
+  commits.forEach(c => {
+    const k = dayKey(c.t);
+    if (k !== curDay) {
+      if (curDay) html += '</div>';
+      curDay = k;
+      html += '<div class="day">Changes on ' + esc(new Date(c.t).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })) + '</div><div class="box">';
+    }
+    html += renderCommit(c);
+  });
+  html += '</div>';
+  $('#view').innerHTML = html;
+}
+
+function renderCommit(c) {
+  const open = state.expanded.has(c.id);
+  const add = c.shown.filter(x => clsOf(x.change) === 'add').length;
+  const del = c.shown.filter(x => clsOf(x.change) === 'del').length;
+  const mod = c.shown.length - add - del;
+  const people = c.people.length ? c.people : ['Unknown'];
+  let h = '<div class="commit' + (open ? ' open' : '') + '">' +
+    '<button class="chead" data-act="toggle" data-commit="' + esc(c.id) + '">' +
+      '<span class="avs">' + people.slice(0, 3).map(p => avatar(p)).join('') + '</span>' +
+      '<span class="cmain"><div class="ctitle">' + esc(commitTitle(c)) + '</div>' +
+      '<div class="cmeta"><b>' + esc(listNice(people)) + '</b> · <span title="' + esc(fullTime(c.t)) + '">' + esc(ago(c.t)) + '</span>' +
+      (people.length > 1 ? ' · edited together' : '') + '</div></span>' +
+      '<span class="cright">' +
+        (add ? '<span class="cnt add">+' + add + '</span>' : '') +
+        (del ? '<span class="cnt del">−' + del + '</span>' : '') +
+        (mod ? '<span class="cnt mod">~' + mod + '</span>' : '') +
+        '<span class="sha">' + esc(c.id.slice(0, 7)) + '</span><span class="chev">›</span>' +
+      '</span>' +
+    '</button><div class="cbody">';
+  if (open) {
+    const groups = new Map();
+    c.shown.forEach(x => {
+      const k = x.slideId || '_deck';
+      if (!groups.has(k)) groups.set(k, []);
+      groups.get(k).push(x);
+    });
+    groups.forEach(list => {
+      const r = list[0];
+      h += '<div class="slidegrp"><div class="sghead">' + esc(slideName(r)) +
+        (r.slideTitle ? ' <span>— ' + esc(r.slideTitle) + '</span>' : '') + '</div>' +
+        list.map(renderChange).join('') + '</div>';
+    });
+  }
+  return h + '</div></div>';
+}
+
+function renderChange(x) {
+  const [label, cls] = typeOf(x.change);
+  let h = '<div class="ch"><div class="chline"><span class="badge b-' + cls + '">' + esc(label) + '</span>';
+  if (x.element) h += '<span class="el">' + esc(x.element) + '</span>';
+  if (x.details && x.change !== 'CHECKPOINT') h += '<span class="det">' + esc(x.details) + '</span>';
+  if (x.change === 'CHECKPOINT') h += '<span>' + esc(x.details) + '</span>';
+  if (x.elementId) h += '<button class="linkbtn" data-act="elHistory" data-el="' + esc(x.elementId) + '">history</button>';
+  h += '</div>';
+  if (TEXT_DIFF_TYPES.has(x.change) && (x.before || x.after)) h += renderDiff(x.before, x.after);
+  else if ((x.change === 'ELEMENT_ADDED' || x.change === 'SLIDE_ADDED') && x.after) h += '<div class="diff all-add">' + esc(x.after) + '</div>';
+  else if ((x.change === 'ELEMENT_DELETED' || x.change === 'SLIDE_DELETED') && x.before) h += '<div class="diff all-del">' + esc(x.before) + '</div>';
+  return h + '</div>';
+}
+
+function renderBlame() {
+  const d = state.data;
+  const lastEl = new Map(), countEl = new Map(), lastSlide = new Map(), created = new Map(), notes = new Map();
+  d.rows.forEach(r => {
+    if (r.elementId) { lastEl.set(r.elementId, r); countEl.set(r.elementId, (countEl.get(r.elementId) || 0) + 1); }
+    if (r.slideId) {
+      lastSlide.set(r.slideId, r);
+      if (r.change === 'SLIDE_ADDED') created.set(r.slideId, r);
+      if (r.change === 'NOTES_EDITED') notes.set(r.slideId, r);
+    }
+  });
+  const who = r => r
+    ? '<span class="who">' + r.people.slice(0, 2).map(p => avatar(p)).join('') + '<b>' + esc(listNice(r.people)) + '</b> · ' +
+      '<span class="badge b-' + clsOf(r.change) + '">' + esc(typeOf(r.change)[0]) + '</span> · <span title="' + esc(fullTime(r.t)) + '">' + esc(ago(r.t)) + '</span></span>'
+    : '<span class="who never">unchanged since tracking started</span>';
+
+  let slides = d.current;
+  if (!slides.length) {   // older web app without "current": rebuild from the log
+    const tmp = new Map();
+    d.rows.forEach(r => {
+      if (!r.slideId) return;
+      if (r.change === 'SLIDE_DELETED') { tmp.delete(r.slideId); return; }
+      const s = tmp.get(r.slideId) || { id: r.slideId, elements: new Map() };
+      s.num = r.slideNum; s.title = r.slideTitle;
+      if (r.elementId) { if (r.change === 'ELEMENT_DELETED') s.elements.delete(r.elementId); else s.elements.set(r.elementId, { id: r.elementId, label: r.element }); }
+      tmp.set(r.slideId, s);
+    });
+    slides = [...tmp.values()].map(s => Object.assign(s, { elements: [...s.elements.values()] })).sort((a, b) => a.num - b.num);
+  }
+  if (!slides.length) { $('#view').innerHTML = '<div class="box empty" style="margin-top:16px">No slides to show yet.</div>'; return; }
+
+  let html = '<p class="status" style="padding-top:16px">Who last touched each slide and object, like <code>git blame</code>. Click “history” to see every change to an object.</p>';
+  slides.forEach(s => {
+    const last = lastSlide.get(s.id), cr = created.get(s.id);
+    html += '<div class="card"><div class="cardh"><span class="t">Slide ' + s.num + ' — ' + esc(s.title) + '</span>' +
+      '<span class="never">' + (cr ? 'created by <b>' + esc(listNice(cr.people)) + '</b> ' + esc(ago(cr.t)) + ' · ' : '') +
+      (last ? 'last change ' + esc(ago(last.t)) : 'no changes yet') + '</span>' +
+      '<button class="linkbtn" data-act="slideHistory" data-slide="' + esc(s.id) + '">history</button></div>';
+    const els = s.elements || [];
+    els.forEach(e => {
+      const r = lastEl.get(e.id), n = countEl.get(e.id) || 0;
+      html += '<div class="brow' + (e.parent ? ' child' : '') + '"><span class="lbl" title="' + esc(e.label) + '">' + esc(e.label) +
+        (n ? ' <button class="linkbtn" data-act="elHistory" data-el="' + esc(e.id) + '">history (' + n + ')</button>' : '') + '</span>' + who(r) + '</div>';
+    });
+    if (notes.has(s.id)) html += '<div class="brow"><span class="lbl">Speaker notes</span>' + who(notes.get(s.id)) + '</div>';
+    if (!els.length && !notes.has(s.id)) html += '<div class="brow"><span class="lbl never">Empty slide</span><span></span></div>';
+    html += '</div>';
+  });
+  const currentIds = new Set(slides.map(s => s.id));
+  const deleted = d.rows.filter(r => r.change === 'SLIDE_DELETED' && !currentIds.has(r.slideId));
+  if (deleted.length) {
+    html += '<div class="card"><div class="cardh"><span class="t">Deleted slides</span></div>' +
+      deleted.slice().reverse().map(r => '<div class="brow"><span class="lbl">' + esc(r.slideTitle || '(untitled)') +
+        ' <button class="linkbtn" data-act="slideHistory" data-slide="' + esc(r.slideId) + '">history</button></span>' + who(r) + '</div>').join('') + '</div>';
+  }
+  $('#view').innerHTML = html;
+}
+
+function renderPeople() {
+  const d = state.data;
+  const rows = d.rows.filter(r => r.change !== 'TRACKING_STARTED');
+  // activity grid: last 16 weeks
+  const days = new Map();
+  rows.forEach(r => { const k = dayKey(r.t); days.set(k, (days.get(k) || 0) + 1); });
+  const max = Math.max(1, ...days.values());
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const start = new Date(today);
+  start.setDate(start.getDate() - (7 * 16 - 1));
+  start.setDate(start.getDate() - start.getDay());   // back up to Sunday
+  let grid = '';
+  for (const dt = new Date(start); dt <= today; dt.setDate(dt.getDate() + 1)) {
+    const n = days.get(dayKey(dt.getTime())) || 0;
+    const lvl = n === 0 ? 0 : Math.min(4, Math.ceil((n / max) * 4));
+    grid += '<i class="l' + lvl + '" title="' + n + ' change' + (n === 1 ? '' : 's') + ' on ' + dt.toLocaleDateString() + '"></i>';
+  }
+
+  const per = new Map();
+  rows.forEach(r => r.people.forEach(p => {
+    if (!per.has(p)) per.set(p, { name: p, n: 0, commits: new Set(), slides: new Map(), first: r.t, last: r.t, cls: {} });
+    const o = per.get(p);
+    o.n++; o.commits.add(r.commit); o.last = Math.max(o.last, r.t); o.first = Math.min(o.first, r.t);
+    if (r.slideId) o.slides.set(r.slideId, { n: ((o.slides.get(r.slideId) || {}).n || 0) + 1, label: slideName(r) + ' “' + r.slideTitle + '”' });
+    const c = clsOf(r.change); o.cls[c] = (o.cls[c] || 0) + 1;
+  }));
+  const list = [...per.values()].sort((a, b) => b.n - a.n);
+  const top = Math.max(1, ...list.map(p => p.n));
+
+  let html = '<div class="card" style="margin-top:16px"><div class="cardh"><span class="t">Activity — last 16 weeks</span><span class="never">' + rows.length + ' changes</span></div><div style="padding:12px 14px"><div class="grid">' + grid + '</div></div></div>';
+  if (!list.length) html += '<div class="box empty">No contributions yet.</div>';
+  html += '<div class="people">' + list.map(p => {
+    const segs = Object.keys(CLS_COLORS).filter(k => p.cls[k]).map(k =>
+      '<i style="width:' + (p.cls[k] / top * 100) + '%;background:' + CLS_COLORS[k] + '" title="' + CLS_NAMES[k] + ': ' + p.cls[k] + '"></i>').join('');
+    const leg = Object.keys(CLS_COLORS).filter(k => p.cls[k]).map(k =>
+      '<span style="--c:' + CLS_COLORS[k] + '">' + CLS_NAMES[k] + ' ' + p.cls[k] + '</span>').join('');
+    const topSlides = [...p.slides.values()].sort((a, b) => b.n - a.n).slice(0, 3).map(s => esc(s.label) + ' (' + s.n + ')').join(', ');
+    return '<div class="card person"><div class="phead">' + avatar(p.name, 'big') + '<div><div class="pname">' + esc(p.name) + '</div>' +
+      '<div class="never">active ' + esc(ago(p.first)) + ' → ' + esc(ago(p.last)) + '</div></div></div>' +
+      '<div class="stats"><span><b>' + p.n + '</b> changes</span><span><b>' + p.commits.size + '</b> saves</span><span><b>' + p.slides.size + '</b> slides</span></div>' +
+      '<div class="bar">' + segs + '</div><div class="legend">' + leg + '</div>' +
+      (topSlides ? '<div class="top3">Most edited: ' + topSlides + '</div>' : '') +
+      '<div style="margin-top:10px"><button class="linkbtn" data-act="personHistory" data-person="' + esc(p.name) + '">See their changes →</button></div></div>';
+  }).join('') + '</div>';
+  html += '<p class="status">Saves edited together count for everyone involved.</p>';
+  $('#view').innerHTML = html;
+}
+
+function renderWelcome(err) {
+  $('#tabs').innerHTML = '';
+  $('#filters').classList.add('hidden');
+  $('#deckTitle').textContent = 'Slides Edit History';
+  $('#deckSub').textContent = 'GitHub-style history for Google Slides';
+  $('#view').innerHTML =
+    '<div class="card welcome"><h2>Connect your deck</h2>' +
+    (err ? '<p class="status err">' + esc(err) + '</p>' : '') +
+    '<p>Paste the <b>Web app URL</b> from your Apps Script deployment (it ends in <code>/exec</code>):</p>' +
+    '<input id="srcInput" placeholder="https://script.google.com/macros/s/…/exec" value="' + esc(state.src === 'demo' ? '' : state.src) + '">' +
+    '<div class="row"><button class="btn primary" data-act="saveSrc">Load history</button><button class="btn" data-act="demo">Try demo data</button></div>' +
+    '<h3>Don’t have a URL yet?</h3><ol>' +
+    '<li>Open the deck → <b>Extensions → Apps Script</b>, paste <code>Code.gs</code>.</li>' +
+    '<li>Add services: <b>Google Drive API</b> and <b>Google Slides API</b>.</li>' +
+    '<li>Run <b>setupTracking</b> and allow access.</li>' +
+    '<li><b>Deploy → New deployment → Web app</b>, Execute as <b>Me</b>, access <b>Anyone</b>.</li>' +
+    '<li>Copy the URL and paste it above.</li></ol></div>';
+}
+
+/* ---------- events ---------- */
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-act]');
+  if (!b) return;
+  const act = b.dataset.act;
+  if (act === 'toggle') {
+    const id = b.dataset.commit;
+    state.expanded.has(id) ? state.expanded.delete(id) : state.expanded.add(id);
+    renderHistory();
+  } else if (act === 'tab') { state.tab = b.dataset.tab; render(); window.scrollTo(0, 0); }
+  else if (act === 'refresh') load();
+  else if (act === 'settings') { state.data = null; renderWelcome(); }
+  else if (act === 'saveSrc') {
+    const v = ($('#srcInput').value || '').trim();
+    if (!v) return;
+    state.src = v; state.demo = false; saveSource(v); state.firstLoad = true; load();
+  } else if (act === 'demo') { state.src = 'demo'; load(); }
+  else if (act === 'elHistory' || act === 'slideHistory' || act === 'personHistory') {
+    e.stopPropagation();
+    state.f = { editor: '', slide: '', type: '', q: '', element: '' };
+    if (act === 'elHistory') state.f.element = b.dataset.el;
+    if (act === 'slideHistory') state.f.slide = b.dataset.slide;
+    if (act === 'personHistory') state.f.editor = b.dataset.person;
+    state.tab = 'history';
+    state.expanded = new Set(state.data.commits.filter(c => c.changes.some(matches)).map(c => c.id));
+    render(); window.scrollTo(0, 0);
+  } else if (act === 'clearEl') { state.f.element = ''; render(); }
+});
+$('#fEditor').addEventListener('change', e => { state.f.editor = e.target.value; render(); });
+$('#fSlide').addEventListener('change', e => { state.f.slide = e.target.value; render(); });
+$('#fType').addEventListener('change', e => { state.f.type = e.target.value; render(); });
+let qTimer;
+$('#fQ').addEventListener('input', e => { clearTimeout(qTimer); qTimer = setTimeout(() => { state.f.q = e.target.value.trim(); render(); }, 200); });
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && e.target && e.target.id === 'srcInput') document.querySelector('[data-act="saveSrc"]').click();
+});
+setInterval(() => { if (!document.hidden && state.src && !state.demo) load(); }, REFRESH_MS);
+
+/* ---------- demo data ---------- */
+function demoData() {
+  const now = Date.now(), M = 60000, H = 60 * M, D = 24 * H;
+  const rows = [];
+  const C = (t, commit, editors, list) => list.forEach(x => rows.push(Object.assign({
+    time: new Date(now - t).toISOString(), commit, editors, emails: '', slideNum: null, slideTitle: '', slideId: '',
+    elementId: '', element: '', details: '', before: '', after: '',
+  }, x)));
+  C(4 * D, 'a1f09c2', 'Alex', [{ change: 'TRACKING_STARTED', details: 'Started tracking "Team Presentation" (4 slides)' }]);
+  C(4 * D - 20 * M, 'b77e1d0', 'Alex', [
+    { change: 'TEXT_EDITED', slideNum: 1, slideTitle: 'Our Robot', slideId: 's1', elementId: 'e1', element: 'Title "Our Robot"', details: 'Text changed', before: 'Click to add title', after: 'Our Robot' },
+    { change: 'TEXT_EDITED', slideNum: 1, slideTitle: 'Our Robot', slideId: 's1', elementId: 'e2', element: 'Subtitle "Team Presentation — Fall 2026"', details: 'Text changed', before: '', after: 'Team Presentation — Fall 2026' },
+  ]);
+  C(3 * D, 'c3d5a91', 'Sam', [
+    { change: 'SLIDE_ADDED', slideNum: 3, slideTitle: 'Testing Results', slideId: 's3', details: 'New slide at position 3 (2 objects)', after: 'Testing Results\n---\nTrial | Time | Score\n1 | 58s | 42\n2 | 55s | 47' },
+  ]);
+  C(3 * D - 6 * M, '0d9b2ee', 'Sam', [
+    { change: 'TEXT_EDITED', slideNum: 3, slideTitle: 'Testing Results', slideId: 's3', elementId: 'e8', element: 'Table (4×3) "Trial | Time | Score 1 | 58s | 42 2 | 55s…"', details: 'Text changed', before: 'Trial | Time | Score\n1 | 58s | 42\n2 | 55s | 47', after: 'Trial | Time | Score\n1 | 58s | 42\n2 | 55s | 47\n3 | 52s | 51' },
+    { change: 'FORMAT_CHANGED', slideNum: 3, slideTitle: 'Testing Results', slideId: 's3', elementId: 'e7', element: 'Title "Testing Results"', details: 'Text formatting changed (font, size, color, bullets…)' },
+  ]);
+  C(2 * D, 'e41c7b3', 'Riley', [
+    { change: 'ELEMENT_ADDED', slideNum: 2, slideTitle: 'How It Works', slideId: 's2', elementId: 'e6', element: 'Image', details: 'Added Image at (5.10 in, 1.40 in), size 3.50 in × 2.60 in' },
+    { change: 'MOVED', slideNum: 2, slideTitle: 'How It Works', slideId: 's2', elementId: 'e4', element: 'Title "How It Works"', details: 'Moved from (0.50 in, 0.40 in) to (0.50 in, 0.25 in)' },
+  ]);
+  C(2 * D - 3 * M, 'f00a913', 'Riley', [{ change: 'CHECKPOINT', details: 'Finished the How It Works slide' }]);
+  C(5 * H, '7ab21c4', 'Alex, Sam', [
+    { change: 'TEXT_EDITED', slideNum: 2, slideTitle: 'How It Works', slideId: 's2', elementId: 'e5', element: 'Body text "The robot uses two motors to drive and a…"', details: 'Text changed', before: 'The robot uses two motors to drive and one to lift.', after: 'The robot uses two motors to drive and a third motor to lift the arm.' },
+    { change: 'RESIZED', slideNum: 2, slideTitle: 'How It Works', slideId: 's2', elementId: 'e6', element: 'Image', details: 'Resized from 3.50 in × 2.60 in to 4.00 in × 2.97 in' },
+  ]);
+  C(3 * H, '91ce0f7', 'Sam', [
+    { change: 'SLIDE_DELETED', slideNum: 4, slideTitle: 'Old Ideas', slideId: 's5', details: 'Deleted slide 4 "Old Ideas"', before: 'Old Ideas\n---\nTank treads?\nClaw on top' },
+    { change: 'SLIDE_MOVED', slideNum: 4, slideTitle: 'Next Steps', slideId: 's4', details: 'Moved slide from position 5 to 4', before: '5', after: '4' },
+    { change: 'NOTES_EDITED', slideNum: 2, slideTitle: 'How It Works', slideId: 's2', details: 'Speaker notes edited', before: 'Talk about motors', after: 'Talk about the motors and show the arm lifting' },
+  ]);
+  C(20 * M, '3e8d6aa', 'Riley', [
+    { change: 'TEXT_EDITED', slideNum: 4, slideTitle: 'Next Steps', slideId: 's4', elementId: 'e10', element: 'Body text "Practice driving Add a sensor Tidy wires"', details: 'Text and formatting changed', before: 'Practice driving\nAdd a sensor', after: 'Practice driving\nAdd a distance sensor\nTidy wires' },
+    { change: 'ELEMENT_DELETED', slideNum: 4, slideTitle: 'Next Steps', slideId: 's4', elementId: 'e11', element: 'Shape (star) "TODO"', details: 'Deleted Shape (star)', before: 'TODO' },
+  ]);
+  return {
+    deck: { title: 'Team Presentation (demo)', url: '' },
+    generated: new Date().toISOString(), lastChecked: new Date(now - 40000).toISOString(), rows,
+    current: [
+      { id: 's1', num: 1, title: 'Our Robot', elements: [{ id: 'e1', label: 'Title "Our Robot"' }, { id: 'e2', label: 'Subtitle "Team Presentation — Fall 2026"' }, { id: 'e3', label: 'Image' }] },
+      { id: 's2', num: 2, title: 'How It Works', elements: [{ id: 'e4', label: 'Title "How It Works"' }, { id: 'e5', label: 'Body text "The robot uses two motors to drive and a…"' }, { id: 'e6', label: 'Image' }] },
+      { id: 's3', num: 3, title: 'Testing Results', elements: [{ id: 'e7', label: 'Title "Testing Results"' }, { id: 'e8', label: 'Table (4×3) "Trial | Time | Score 1 | 58s | 42 2 | 55s…"' }] },
+      { id: 's4', num: 4, title: 'Next Steps', elements: [{ id: 'e9', label: 'Title "Next Steps"' }, { id: 'e10', label: 'Body text "Practice driving Add a sensor Tidy wires"' }, { id: 'g1', label: 'Group' }, { id: 'e12', label: 'Shape (arrow)', parent: 'g1' }] },
+    ],
+  };
+}
+
+/* ---------- go ---------- */
+state.src = getSource();
+load();
+})();
+</script>
+</body>
+</html>
