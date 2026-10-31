@@ -43,6 +43,8 @@ header{background:var(--panel);border-bottom:1px solid var(--border)}
 .btn.primary{background:#1f883d;border-color:#1f883d;color:#fff}
 .btn.danger{background:var(--del);border-color:var(--del);color:#fff}
 .btn.sm{padding:2px 9px;font-size:12px}
+.spin{display:inline-block;animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
 .menu{position:relative}
 .menu .pop{position:absolute;right:0;top:calc(100% + 4px);background:var(--panel);border:1px solid var(--border);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.15);padding:6px;z-index:30;min-width:220px}
 .menu .pop button{display:block;width:100%;text-align:left;border:0;background:none;padding:7px 10px;border-radius:6px;cursor:pointer}
@@ -75,7 +77,8 @@ header{background:var(--panel);border-bottom:1px solid var(--border)}
 .ctitle{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .cmeta{color:var(--muted);font-size:12px}
 .conf{font-size:11px;border-radius:20px;padding:0 6px;margin-left:4px;white-space:nowrap}
-.conf.ok{background:var(--add-bg);color:var(--add)} .conf.share{background:var(--mod-bg);color:var(--mod)} .conf.prob{background:var(--note-bg);color:var(--note)}
+.conf.ok{background:var(--add-bg);color:var(--add)} .conf.nop{background:var(--del-bg);color:var(--del)}
+.warnbar{background:var(--del-bg);color:var(--text);border:1px solid var(--del);border-radius:6px;padding:8px 12px;font-size:13px;margin-top:4px} .conf.share{background:var(--mod-bg);color:var(--mod)} .conf.prob{background:var(--note-bg);color:var(--note)}
 .cright{display:flex;align-items:center;gap:6px;flex:none}
 .sha{font:12px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:var(--muted);border:1px solid var(--border);border-radius:6px;padding:1px 6px}
 .cnt{font:600 12px ui-monospace,monospace}
@@ -230,7 +233,7 @@ footer{color:var(--muted);font-size:12px;text-align:center;padding:30px 0}
           <button data-act="export" data-fmt="csv">CSV<small>Opens in Excel / Google Sheets</small></button>
         </div>
       </div>
-      <button class="btn" data-act="refresh" title="Reload now">⟳</button>
+      <button class="btn primary" data-act="refresh" id="updateBtn" title="Check the deck for changes right now">⟳ Update</button>
       <button class="btn" data-act="settings" title="Change data source">⚙</button>
     </div>
     <nav class="tabs" id="tabs"></nav>
@@ -399,7 +402,7 @@ function renderDiff(before, after) {
 /* ---------- data ---------- */
 function prepare(j) {
   const all = (j.rows || []).map((r, i) => Object.assign({}, r, {
-    idx: i, t: Date.parse(r.time) || 0, people: splitPeople(r.editors),
+    idx: i, t: Date.parse(r.time) || 0, people: splitPeople(r.editors), nopanelList: splitPeople(r.nopanel),
     before: cleanText(r.before), after: cleanText(r.after), details: cleanText(r.details),
     element: cleanText(r.element), slideTitle: cleanText(r.slideTitle),
   }));
@@ -409,10 +412,12 @@ function prepare(j) {
   const rows = all.filter(r => !INTERNAL.has(r.change));
   const map = new Map();
   rows.forEach(r => {
-    const k = r.commit || ('row' + r.idx);
-    if (!map.has(k)) map.set(k, { id: k, t: r.t, people: r.people, attrib: attribOf(r), changes: [] });
+    // one entry per person per check, so simultaneous editors each get their own line
+    const k = (r.commit || ('row' + r.idx)) + '|' + r.editors;
+    if (!map.has(k)) map.set(k, { id: k, sha: r.commit || '', t: r.t, people: r.people, attrib: attribOf(r), changes: [] });
     map.get(k).changes.push(r);
   });
+  map.forEach(c => { c.nopanel = uniq(c.changes.flatMap(x => x.nopanelList)).filter(p => c.people.includes(p)); });
   const commits = [...map.values()].sort((a, b) => a.t - b.t || a.changes[0].idx - b.changes[0].idx);
   commits.reverse();
   const people = uniq(rows.filter(r => clsOf(r.change) !== 'note').flatMap(r => r.people))
@@ -473,9 +478,9 @@ function whoLine(people, attrib) {
   if (attrib === 'shared' && names.length > 1)
     return '<b>' + esc(listNice(names, 'or')) + '</b><span class="conf share" title="Several people edited during the same check window, so we can’t tell which of them made each change.">same time window</span>';
   if (attrib === 'probable')
-    return '<b>' + esc(names.join(', ')) + '</b><span class="conf prob" title="Google hadn’t listed this edit yet; this is the most recent editor.">probably</span>';
+    return '<b>' + esc(names.join(', ')) + '</b><span class="conf prob" title="They had this slide or object selected (or were the last editor), but someone else may also have been editing.">probably</span>';
   if (/^(Automatic|Unknown)$/.test(names[0])) return '<b>' + esc(names[0]) + '</b>';
-  return '<b>' + esc(listNice(names)) + '</b><span class="conf ok" title="Only this person edited during this window.">✓ confirmed</span>';
+  return '<b>' + esc(listNice(names)) + '</b><span class="conf ok" title="Only this person edited — or they had this exact object selected while nobody else did.">✓ confirmed</span>';
 }
 
 /* ---------- loading ---------- */
@@ -507,8 +512,13 @@ async function postJSON(body) {
   return j;
 }
 
-async function load(force) {
-  if (state.loading) return;
+function load(force) {
+  if (state.loading) return state.loadP;           // a check is already running → wait for that one
+  state.loadP = loadOnce(force).finally(() => { state.loadP = null; });
+  return state.loadP;
+}
+async function loadOnce(force) {
+  state.lastLoadError = '';
   if (state.src === 'demo') {
     state.demo = true;
     if (!state.data) state.data = prepare(demoData());
@@ -522,15 +532,41 @@ async function load(force) {
     const j = await getJSON(withParams(state.src, 'check=1&_=' + Date.now()));
     const prev = state.data;
     state.data = prepare(j);
-    if (j.checkError) setStatus('Live check failed: ' + j.checkError, true);
+    if (j.checkError) { state.lastLoadError = j.checkError; setStatus('Live check failed: ' + j.checkError, true); }
     else setStatus('Live · checked ' + new Date().toLocaleTimeString() + ' · updates every ' + (REFRESH_MS / 1000) + 's');
     if (force || !prev || prev.all.length !== state.data.all.length || Date.now() - state.lastRender > 60000) render();
   } catch (err) {
     const msg = (err && err.message) || String(err);
+    state.lastLoadError = msg;
     setStatus('Couldn’t load: ' + (msg === 'Failed to fetch' ? 'network error, or the web app isn’t shared with “Anyone”.' : msg), true);
     if (!state.data) renderWelcome(msg);
   } finally {
     state.loading = false;
+  }
+}
+/* The Update button: check the deck right now and say what was found. */
+async function updateNow() {
+  const btn = $('#updateBtn');
+  if (!btn || btn.disabled) return;
+  if (state.demo) { setStatus('This is demo data — there’s no real deck to check.'); return; }
+  if (!state.src) { renderWelcome(); return; }
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spin">⟳</span> Checking…';
+  const before = state.data ? state.data.rows.length : 0;
+  try {
+    if (state.loadP) await state.loadP;   // let a background check finish, then do a fresh one
+    await load(true);
+    if (!state.lastLoadError && state.data) {
+      const n = state.data.rows.length - before;
+      setStatus('✓ Updated ' + new Date().toLocaleTimeString() + ' — ' +
+        (n > 0 ? n + ' new change' + (n === 1 ? '' : 's') + ' found' : 'no new changes'));
+      if (n > 0 && state.tab === 'history' && state.data.commits[0]) {
+        state.expanded.add(state.data.commits[0].id); render(); window.scrollTo(0, 0);
+      }
+    }
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '⟳ Update';
   }
 }
 function setStatus(t, err) { const el = $('#status'); el.textContent = t; el.className = 'status' + (err ? ' err' : ''); }
@@ -642,6 +678,10 @@ function renderHistory() {
   if (state.firstLoad) { const first = commits.find(c => !c.changes.every(x => clsOf(x.change) === 'note')); if (first) state.expanded.add(first.id); state.firstLoad = false; }
 
   let html = '', curDay = '';
+  const dayAgo = Date.now() - 864e5;
+  const skipped = uniq(d.rows.filter(r => r.t >= dayAgo).flatMap(r => r.nopanelList));
+  if (skipped.length) html += '<div class="warnbar">🚫 Edited without the “Who did what” panel in the last 24 hours: <b>' + esc(listNice(skipped, 'and')) +
+    '</b>. Their changes can’t always be credited correctly — ask them to open <b>Edit History → Open the “Who did what” panel</b> before editing.</div>';
   commits.forEach(c => {
     const k = dayKey(c.t);
     if (k !== curDay) {
@@ -667,16 +707,18 @@ function renderCommit(c) {
     '<div class="chead" role="button" tabindex="0" data-act="toggle" data-commit="' + esc(c.id) + '">' +
       '<span class="avs">' + people.slice(0, 3).map(p => avatar(p, unsure ? 'unsure' : '')).join('') + '</span>' +
       '<span class="cmain"><div class="ctitle">' + esc(commitTitle(c)) + '</div>' +
-      '<div class="cmeta">' + whoLine(people, c.attrib) + ' · <span title="' + esc(fullTime(c.t)) + '">' + esc(ago(c.t)) + '</span></div></span>' +
+      '<div class="cmeta">' + whoLine(people, c.attrib) +
+        (c.nopanel && c.nopanel.length ? '<span class="conf nop" title="Edited without the “Who did what” panel open">🚫 no panel' + (people.length > 1 ? ': ' + esc(c.nopanel.join(', ')) : '') + '</span>' : '') +
+        ' · <span title="' + esc(fullTime(c.t)) + '">' + esc(ago(c.t)) + '</span></div></span>' +
       '<span class="cright">' +
         (add ? '<span class="cnt add">+' + add + '</span>' : '') +
         (del ? '<span class="cnt del">−' + del + '</span>' : '') +
         (mod > 0 ? '<span class="cnt mod">~' + mod + '</span>' : '') +
-        '<span class="sha">' + esc(c.id.slice(0, 7)) + '</span>' + (isVer ? '' : '<span class="chev">›</span>') +
+        '<span class="sha">' + esc((c.sha || c.id).slice(0, 7)) + '</span>' + (isVer ? '' : '<span class="chev">›</span>') +
       '</span>' +
     '</div><div class="cbody">';
   if (open && !isVer) {
-    if (c.attrib === 'shared') h += '<div class="note-line">⚠ ' + esc(listNice(people, 'and')) + ' were all editing during the same check window, so these changes can’t be split between them.</div>';
+    if (c.attrib === 'shared') h += '<div class="note-line">⚠ ' + esc(listNice(people, 'and')) + ' were all editing during the same minute and nobody had the “Who did what” panel open on these objects, so these changes can’t be split between them.</div>';
     const groups = new Map();
     c.shown.forEach(x => { const k = x.slideId || '_deck'; if (!groups.has(k)) groups.set(k, []); groups.get(k).push(x); });
     groups.forEach((list, sid) => {
@@ -790,7 +832,7 @@ function renderCheckpoints() {
     html += '<div class="vrow"><span class="vicon named">📌</span>' +
       '<div class="vmain"><div class="vname">' + esc(v.details) + '</div><div class="never">' + esc(fullTime(v.t)) + ' (' + esc(ago(v.t)) + ')' +
       (v.editors ? ' · by ' + esc(v.editors) : '') + ' · ' + fmtN(since) + ' change' + (since === 1 ? '' : 's') + ' since</div></div>' +
-      '<button class="btn sm" data-act="showCommit" data-commit="' + esc(v.commit) + '">Show in history</button></div>';
+      '<button class="btn sm" data-act="showCommit" data-commit="' + esc(v.commit + '|' + v.editors) + '">Show in history</button></div>';
   });
   html += '</div><p class="status">To undo changes, use the 🖼 before/after pictures in History, or Google’s own <b>File → Version history</b> in the deck.</p>';
   $('#view').innerHTML = html;
@@ -862,9 +904,10 @@ function perPerson() {
   d.rows.filter(r => clsOf(r.change) !== 'note').forEach(r => {
     const a = attribOf(r);
     r.people.filter(p => !/^(Automatic|Unknown)$/.test(p)).forEach(p => {
-      if (!per.has(p)) per.set(p, { name: p, n: 0, confirmed: 0, shared: 0, probable: 0, commits: new Set(), slides: new Map(), first: r.t, last: r.t, cls: {} });
+      if (!per.has(p)) per.set(p, { name: p, n: 0, nopanel: 0, confirmed: 0, shared: 0, probable: 0, commits: new Set(), slides: new Map(), first: r.t, last: r.t, cls: {} });
       const o = per.get(p);
       o.n++; o[a === 'confirmed' ? 'confirmed' : a === 'probable' ? 'probable' : 'shared']++;
+      if (r.nopanelList.includes(p)) o.nopanel++;
       o.commits.add(r.commit); o.last = Math.max(o.last, r.t); o.first = Math.min(o.first, r.t);
       if (r.slideId) o.slides.set(r.slideId, { n: ((o.slides.get(r.slideId) || {}).n || 0) + 1, label: slideName(r) + ' “' + r.slideTitle + '”' });
       const c = clsOf(r.change); o.cls[c] = (o.cls[c] || 0) + 1;
@@ -875,15 +918,16 @@ function perPerson() {
 
 function renderPeople() {
   const list = perPerson();
-  let html = '<p class="status" style="padding-top:16px"><b>Confirmed</b> = they were the only person editing in that check window. ' +
-    '<b>Same window</b> = several people were editing at once, so it might have been any of them.</p>';
+  let html = '<p class="status" style="padding-top:16px"><b>Confirmed</b> = they were the only one editing, or the “Who did what” panel saw them working on that exact object. ' +
+    '<b>Same window</b> = several people were editing at once without the panel, so it might have been any of them.</p>';
   if (!list.length) html += '<div class="box empty">No contributions yet.</div>';
   html += '<div class="people">' + list.map(p => {
     const topSlides = [...p.slides.values()].sort((a, b) => b.n - a.n).slice(0, 3).map(s => esc(s.label) + ' (' + s.n + ')').join(', ');
     const max = Math.max(1, p.n);
     return '<div class="card person"><div class="phead">' + avatar(p.name, 'big') + '<div><div class="pname">' + esc(p.name) + '</div>' +
       '<div class="never">active ' + esc(ago(p.first)) + ' → ' + esc(ago(p.last)) + '</div></div></div>' +
-      '<div class="stats"><span><b>' + p.confirmed + '</b> confirmed</span><span><b>' + (p.shared + p.probable) + '</b> same window / probable</span><span><b>' + p.slides.size + '</b> slides</span></div>' +
+      '<div class="stats"><span><b>' + p.confirmed + '</b> confirmed</span><span><b>' + (p.shared + p.probable) + '</b> same window / probable</span><span><b>' + p.slides.size + '</b> slides</span>' +
+      (p.nopanel ? '<span class="conf nop" title="Changes made without the “Who did what” panel open">🚫 ' + p.nopanel + ' without panel</span>' : '') + '</div>' +
       '<div class="hb" style="grid-template-columns:1fr;margin:10px 0 4px"><div class="track">' +
         (p.confirmed ? '<i style="width:' + (p.confirmed / max * 100) + '%;background:var(--s1)" data-tip="<b>' + p.confirmed + '</b> confirmed changes"></i>' : '') +
         (p.shared + p.probable ? '<i style="width:' + ((p.shared + p.probable) / max * 100) + '%;background:var(--s2)" data-tip="<b>' + (p.shared + p.probable) + '</b> same window / probable"></i>' : '') +
@@ -1108,7 +1152,7 @@ document.addEventListener('click', e => {
     state.expanded.has(id) ? state.expanded.delete(id) : state.expanded.add(id);
     renderHistory(); fillLive();
   } else if (act === 'tab') { state.tab = b.dataset.tab; render(); window.scrollTo(0, 0); }
-  else if (act === 'refresh') load(true);
+  else if (act === 'refresh') updateNow();
   else if (act === 'settings') { state.data = null; renderWelcome(); }
   else if (act === 'saveSrc') {
     const v = ($('#srcInput').value || '').trim();
@@ -1252,6 +1296,7 @@ function demoData() {
     { change: 'SLIDE_MOVED', slideNum: 4, slideTitle: 'Next Steps', slideId: 's4', details: 'Moved slide from position 5 to 4', before: '5', after: '4' },
     { change: 'NOTES_EDITED', slideNum: 2, slideTitle: 'How It Works', slideId: 's2', details: 'Speaker notes edited', before: 'Talk about motors', after: 'Talk about the motors\u000band show the arm lifting' },
   ]);
+  rows.filter(r => r.commit === '91ce0f7').forEach(r => { r.nopanel = 'Sam'; });   // demo: Sam edited without the panel
   C(20 * M, '3e8d6aa', 'Riley', 'confirmed', [
     { change: 'TEXT_EDITED', slideNum: 4, slideTitle: 'Next Steps', slideId: 's4', elementId: 'e10', element: 'Body text "1. Practice driving 2. Add a distance…"', details: 'Text and formatting changed', before: '1. Practice driving\n2. Add a sensor', after: '1. Practice driving\n2. Add a distance sensor\n3. Tidy wires', geo: geo(L('s4', 'e10'), L('s4', 'e10')) },
     { change: 'ELEMENT_DELETED', slideNum: 4, slideTitle: 'Next Steps', slideId: 's4', elementId: 'e11', element: 'Shape (star) "TODO"', details: 'Deleted Shape (star)', before: 'TODO', geo: geo(L('s4', 'e11'), null) },
